@@ -1,3 +1,5 @@
+pub mod json_decode;
+
 #[cfg(test)]
 mod tests {
     #[test]

@@ -6,4 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-berlin-core = {path = "../berlin-core"}
+berlin-core = { path = "../berlin-core" }
+dirs = "4.0.0"
+
+ustr = { version = "0.8.1", features = ["serde"] }
+
+serde = { version = "1.0.133", features = ["derive"] }
+serde_json = "1.0.74"

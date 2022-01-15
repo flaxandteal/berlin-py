@@ -1,13 +1,23 @@
 use std::fs::File;
 use std::io::BufReader;
 
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use ustr::Ustr;
+use structopt::StructOpt;
+use tracing::{error, info};
 
 use berlin_core::json_decode::AnyLocationCode;
+use berlin_web::init_logging;
+
+#[derive(StructOpt)]
+struct CliArgs {
+    #[structopt(long = "log-level", case_insensitive = true, default_value = "INFO")]
+    log_level: tracing::Level,
+}
 
 fn main() {
+    let args = CliArgs::from_args();
+    init_logging(args.log_level);
+
     let files = vec![
         "berlin-state.json",
         "berlin-subdivision.json",
@@ -18,7 +28,7 @@ fn main() {
     let app_cache = caches.join("berlin");
     for file in files {
         let path = app_cache.join(file);
-        println!("file {path:?}");
+        info!("file {path:?}");
         let fo = File::open(path).expect("cannot open json file");
         let reader = BufReader::new(fo);
         let json: serde_json::Value = serde_json::from_reader(reader).expect("cannot decode json");
@@ -31,12 +41,15 @@ fn main() {
                     match loc {
                         Ok(loc) => {} // not implemented
                         Err(err) => {
-                            println!("Error for: {} {:?}", id, err);
+                            error!("Error for: {} {:?}", id, err);
                         }
                     }
                 }
             }
-            _ => panic!("Expected JSON object, found something else"),
+            other => panic!(
+                "Expected a JSON object, found other json structure: {:?}",
+                other
+            ),
         }
     }
 }

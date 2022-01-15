@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::hash::Hash;
 
 use serde::de::Error;
 use serde::Deserialize;
+use strsim::normalized_levenshtein;
 use ustr::Ustr;
 
 #[derive(Debug, Deserialize)]
@@ -12,22 +14,48 @@ pub struct AnyLocationCode {
     d: serde_json::Value,
 }
 
-impl AnyLocationCode {
-    pub fn dispatch(self) -> serde_json::Result<LocationCode> {
-        match self.c.as_str() {
-            "ISO-3166-1" => Ok(LocationCode::St(State::from_raw(self.d)?)),
-            "ISO-3166-2" => Ok(LocationCode::Subdv(Subdivision::from_raw(self.d)?)),
-            "UN-LOCODE" => Ok(LocationCode::Locd(Locode::from_raw(self.d)?)),
-            "IATA" => Ok(LocationCode::Airp(Airport::from_raw(self.d)?)),
+#[derive(Debug)]
+pub struct Location {
+    pub key: Ustr,
+    // Unified encoding+id Ustr for convenient usage as a key in hashmaps etc.
+    encoding: Ustr,
+    id: Ustr,
+    data: LocData,
+}
+
+impl Location {
+    pub fn from_raw(r: AnyLocationCode) -> serde_json::Result<Self> {
+        let encoding: Ustr = r.c.as_str().into();
+        let data = match r.c.as_str() {
+            "ISO-3166-1" => LocData::St(State::from_raw(r.d)?),
+            "ISO-3166-2" => LocData::Subdv(Subdivision::from_raw(r.d)?),
+            "UN-LOCODE" => LocData::Locd(Locode::from_raw(r.d)?),
+            "IATA" => LocData::Airp(Airport::from_raw(r.d)?),
             standard => {
                 panic!("Unexpected location standard {}", standard)
             }
+        };
+        let id: Ustr = r.i.into();
+        let key = encoding.to_string() + id.as_str();
+        Ok(Self {
+            key: Ustr::from(&key),
+            id: id,
+            encoding,
+            data,
+        })
+    }
+    pub fn search(&self, term: &str) -> f64 {
+        match &self.data {
+            LocData::St(d) => d.search(term),
+            LocData::Subdv(d) => d.search(term),
+            LocData::Locd(d) => d.search(term),
+            LocData::Airp(d) => d.search(term),
         }
     }
 }
 
 #[derive(Debug)]
-pub enum LocationCode {
+pub enum LocData {
     St(State),
     Subdv(Subdivision),
     Locd(Locode),
@@ -44,6 +72,9 @@ pub struct State {
 }
 
 impl State {
+    fn search(&self, t: &str) -> f64 {
+        normalized_levenshtein(&self.name, t)
+    }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
         Ok(Self {
@@ -65,6 +96,9 @@ pub struct Subdivision {
 }
 
 impl Subdivision {
+    fn search(&self, t: &str) -> f64 {
+        normalized_levenshtein(&self.name, t)
+    }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
         Ok(Self {
@@ -87,6 +121,9 @@ pub struct Locode {
 }
 
 impl Locode {
+    fn search(&self, t: &str) -> f64 {
+        normalized_levenshtein(&self.name, t)
+    }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
         Ok(Self {
@@ -126,6 +163,9 @@ pub struct Airport {
 }
 
 impl Airport {
+    fn search(&self, t: &str) -> f64 {
+        normalized_levenshtein(&self.name, t)
+    }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let raw = serde_json::from_value::<AirportRaw>(r)?;
         Ok(Self {

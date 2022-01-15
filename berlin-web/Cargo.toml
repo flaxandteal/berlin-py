@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 berlin-core = { path = "../berlin-core" }
 dirs = "4.0.0"
+promptly = "0.3.0"
 
 serde = { version = "1.0.133", features = ["derive"] }
 serde_json = "1.0.74"

@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use serde_json::Value;
 use structopt::StructOpt;
+use tracing::log::warn;
 use tracing::{error, info};
 
 use berlin_core::json_decode::{AnyLocationCode, Location};
@@ -57,16 +58,13 @@ fn main() {
                     }
                 });
                 info!(
-                    "{} decoded/dispatched to native structs: {:.2?}",
+                    "{} decoded to native structs: {:.2?}",
                     file,
                     start.elapsed()
                 );
                 codes
             }
-            other => panic!(
-                "Expected a JSON object, found other json structure: {:?}",
-                other
-            ),
+            other => panic!("Expected a JSON object: {:?}", other),
         }
     });
     let codes: UstrMap<Location> = codes_vectors.flatten().collect();
@@ -78,6 +76,12 @@ fn main() {
     state.all = codes;
     loop {
         let inp: String = promptly::prompt("Search Term").expect("Search term expected");
-        search(&state, inp)
+        let start = Instant::now();
+        let res = search(&state, inp, 10);
+        for (i, (loc_key, score)) in res.iter().enumerate() {
+            info!("Result #{} {:?} score:{}", i, loc_key, score);
+            info!("{:?}", &state.all.get(&loc_key).unwrap().data);
+        }
+        warn!("Search took {:.2?}", start.elapsed());
     }
 }

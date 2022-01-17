@@ -1,8 +1,9 @@
-use std::time::Instant;
+use std::cmp::max;
 
-use priority_queue::PriorityQueue;
 pub use rayon;
-use tracing::info;
+use rayon::prelude::*;
+use regex::Regex;
+use strsim::jaro_winkler as similarity_algo;
 pub use ustr;
 use ustr::{Ustr, UstrMap};
 
@@ -24,17 +25,33 @@ pub struct CodeBank {
     pub all: UstrMap<Location>,
 }
 
-pub fn search(cb: &CodeBank, search_term: String) {
-    let start = Instant::now();
-    let mut pq: PriorityQueue<Ustr, i64> = PriorityQueue::new();
-    for (key, loc) in cb.all.iter() {
-        let search_score: i64 = (loc.search(&search_term) * 1000.) as i64;
-        pq.push(*key, search_score);
+pub fn search(cb: &CodeBank, search_term: String, limit: usize) -> Vec<(Ustr, u64)> {
+    let re_str = format!(r"(?i)\b{}\b", search_term);
+    let re = Regex::new(&*re_str).unwrap();
+    let res = cb.all.par_iter().filter_map(|(key, loc)| {
+        let score = loc.search(&search_term, &re);
+        match score > 500 {
+            true => Some((*key, score)),
+            false => None,
+        }
+    });
+    let mut res = res.collect::<Vec<_>>();
+    res.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    if res.len() > limit {
+        res[..limit].to_vec()
+    } else {
+        res
     }
-    let first = pq.pop();
-    info!("First result {:?}", first);
-    if let Some(first) = first {
-        info!("{:#?}", cb.all.get(&first.0));
+}
+
+pub fn search_in_string(subject: &str, search_term: &str, re: &Regex) -> u64 {
+    let similarity = (similarity_algo(subject, search_term) * 1000.) as u64;
+    match similarity > 500 {
+        true => match re.is_match(subject) {
+            true if search_term.len() == subject.len() => max(990, similarity),
+            true => max(950, similarity),
+            false => similarity,
+        },
+        false => similarity,
     }
-    info!("Search took {:.2?}", start.elapsed())
 }

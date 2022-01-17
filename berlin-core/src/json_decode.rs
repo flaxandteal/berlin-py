@@ -1,10 +1,12 @@
 use std::collections::HashMap;
-use std::hash::Hash;
 
+use regex::Regex;
 use serde::de::Error;
 use serde::Deserialize;
-use strsim::normalized_levenshtein;
+use strum_macros;
 use ustr::Ustr;
+
+use crate::search_in_string;
 
 #[derive(Debug, Deserialize)]
 pub struct AnyLocationCode {
@@ -20,7 +22,7 @@ pub struct Location {
     // Unified encoding+id Ustr for convenient usage as a key in hashmaps etc.
     encoding: Ustr,
     id: Ustr,
-    data: LocData,
+    pub data: LocData,
 }
 
 impl Location {
@@ -36,25 +38,25 @@ impl Location {
             }
         };
         let id: Ustr = r.i.into();
-        let key = encoding.to_string() + id.as_str();
+        let key = format!("{}#{}", encoding.as_str(), id.as_str());
         Ok(Self {
             key: Ustr::from(&key),
-            id: id,
+            id,
             encoding,
             data,
         })
     }
-    pub fn search(&self, term: &str) -> f64 {
+    pub fn search(&self, term: &str, re: &Regex) -> u64 {
         match &self.data {
-            LocData::St(d) => d.search(term),
-            LocData::Subdv(d) => d.search(term),
-            LocData::Locd(d) => d.search(term),
-            LocData::Airp(d) => d.search(term),
+            LocData::St(d) => d.search(term, re),
+            LocData::Subdv(d) => d.search(term, re),
+            LocData::Locd(d) => d.search(term, re),
+            LocData::Airp(d) => d.search(term, re),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum LocData {
     St(State),
     Subdv(Subdivision),
@@ -72,8 +74,8 @@ pub struct State {
 }
 
 impl State {
-    fn search(&self, t: &str) -> f64 {
-        normalized_levenshtein(&self.name, t)
+    fn search(&self, t: &str, re: &Regex) -> u64 {
+        search_in_string(&self.name, t, re) + 3
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -96,8 +98,8 @@ pub struct Subdivision {
 }
 
 impl Subdivision {
-    fn search(&self, t: &str) -> f64 {
-        normalized_levenshtein(&self.name, t)
+    fn search(&self, t: &str, re: &Regex) -> u64 {
+        search_in_string(&self.name, t, re) + 2
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -121,8 +123,8 @@ pub struct Locode {
 }
 
 impl Locode {
-    fn search(&self, t: &str) -> f64 {
-        normalized_levenshtein(&self.name, t)
+    fn search(&self, t: &str, re: &Regex) -> u64 {
+        search_in_string(&self.name, t, re)
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -163,8 +165,8 @@ pub struct Airport {
 }
 
 impl Airport {
-    fn search(&self, t: &str) -> f64 {
-        normalized_levenshtein(&self.name, t)
+    fn search(&self, t: &str, re: &Regex) -> u64 {
+        search_in_string(&self.name, t, &re) + 1
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let raw = serde_json::from_value::<AirportRaw>(r)?;

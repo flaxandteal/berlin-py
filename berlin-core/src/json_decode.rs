@@ -1,13 +1,12 @@
+use std::cmp::max;
 use std::collections::HashMap;
 
-use deunicode::deunicode;
-use regex::Regex;
 use serde::de::Error;
 use serde::Deserialize;
 use strum_macros;
 use ustr::Ustr;
 
-use crate::{normalize, search_in_string};
+use crate::{normalize, search_in_string, SearchTerm};
 
 #[derive(Debug, Deserialize)]
 pub struct AnyLocationCode {
@@ -47,12 +46,12 @@ impl Location {
             data,
         })
     }
-    pub fn search(&self, term: &str, re: &Regex) -> u64 {
+    pub fn search(&self, term: &SearchTerm) -> u64 {
         match &self.data {
-            LocData::St(d) => d.search(term, re),
-            LocData::Subdv(d) => d.search(term, re),
-            LocData::Locd(d) => d.search(term, re),
-            LocData::Airp(d) => d.search(term, re),
+            LocData::St(d) => d.search(term),
+            LocData::Subdv(d) => d.search(term),
+            LocData::Locd(d) => d.search(term),
+            LocData::Airp(d) => d.search(term),
         }
     }
 }
@@ -75,8 +74,11 @@ pub struct State {
 }
 
 impl State {
-    fn search(&self, t: &str, re: &Regex) -> u64 {
-        search_in_string(&self.name, t, re) + 3
+    fn search(&self, t: &SearchTerm) -> u64 {
+        max(
+            search_in_string(&self.name, t),
+            search_in_string(&self.short, t),
+        )
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -99,8 +101,12 @@ pub struct Subdivision {
 }
 
 impl Subdivision {
-    fn search(&self, t: &str, re: &Regex) -> u64 {
-        search_in_string(&self.name, t, re) + 2
+    fn search(&self, t: &SearchTerm) -> u64 {
+        let code_boost = match t.codes.iter().any(|c| &self.supercode == c) {
+            true => 100,
+            false => 0,
+        };
+        code_boost + search_in_string(&self.name, t)
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -124,8 +130,24 @@ pub struct Locode {
 }
 
 impl Locode {
-    fn search(&self, t: &str, re: &Regex) -> u64 {
-        search_in_string(&self.name, t, re)
+    fn search(&self, t: &SearchTerm) -> u64 {
+        let code_boost = match t.codes.iter().any(|c| {
+            &self.subcode == c
+                || &self.supercode == c
+                || &self.subdivision_code.unwrap_or("".into()) == c
+        }) {
+            true => 100,
+            false => 0,
+        };
+        let sd_boost = match t
+            .names
+            .iter()
+            .any(|n| &self.subdivision_name.unwrap_or("".into()) == n)
+        {
+            true => 100,
+            false => 0,
+        };
+        code_boost + sd_boost + search_in_string(&self.name, t)
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -168,8 +190,16 @@ pub struct Airport {
 }
 
 impl Airport {
-    fn search(&self, t: &str, re: &Regex) -> u64 {
-        search_in_string(&self.name, t, &re) + 1
+    fn search(&self, t: &SearchTerm) -> u64 {
+        let code_boost = match t.codes.iter().any(|c| &self.country == c) {
+            true => 100,
+            false => 0,
+        };
+        code_boost
+            + max(
+                search_in_string(&self.name, t),
+                self.city.map(|c| search_in_string(&c, t)).unwrap_or(0),
+            )
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let raw = serde_json::from_value::<AirportRaw>(r)?;

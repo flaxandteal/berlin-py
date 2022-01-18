@@ -11,7 +11,7 @@ use berlin_core::json_decode::{AnyLocationCode, Location};
 use berlin_core::rayon::iter::IntoParallelIterator;
 use berlin_core::rayon::prelude::*;
 use berlin_core::ustr::UstrMap;
-use berlin_core::{normalize, search};
+use berlin_core::{mk_search_term, normalize, search};
 use berlin_web::init_logging;
 
 #[derive(StructOpt)]
@@ -33,7 +33,7 @@ fn main() {
     let caches = dirs::cache_dir().expect("caches dir not found");
     let app_cache = caches.join("berlin");
 
-    let mut state = berlin_core::CodeBank::default();
+    let mut db = berlin_core::CodeBank::default();
     let start = Instant::now();
     let codes_vectors = files.into_par_iter().map(|file| {
         let path = app_cache.join(file);
@@ -69,16 +69,17 @@ fn main() {
         codes.len(),
         start.elapsed()
     );
-    state.all = codes;
+    db.all = codes;
     loop {
         let inp: String = promptly::prompt("Search Term").expect("Search term expected");
-        let term = normalize(&inp);
-        error!("NORMALIZED TERM: {term}");
+        let term = mk_search_term(inp);
+        // let term = normalize(&inp);
+        warn!("TERM: {term:#?}");
         let start = Instant::now();
-        let res = search(&state, term, 3);
+        let res = search(&db, term, 3);
         for (i, (loc_key, score)) in res.iter().enumerate() {
             info!("Result #{i} {loc_key:?} score: {score}");
-            info!("{:?}", &state.all.get(&loc_key).unwrap().data);
+            info!("{:?}", &db.all.get(&loc_key).unwrap().data);
         }
         warn!("Search took {:.2?}", start.elapsed());
     }

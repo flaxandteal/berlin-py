@@ -26,11 +26,9 @@ pub struct CodeBank {
     pub all: UstrMap<Location>,
 }
 
-pub fn search(cb: &CodeBank, search_term: String, limit: usize) -> Vec<(Ustr, u64)> {
-    let re_str = format!(r"(?i)\b{}\b", search_term);
-    let re = Regex::new(&*re_str).unwrap();
+pub fn search(cb: &CodeBank, st: SearchTerm, limit: usize) -> Vec<(Ustr, u64)> {
     let res = cb.all.par_iter().filter_map(|(key, loc)| {
-        let score = loc.search(&search_term, &re);
+        let score = loc.search(&st);
         match score > 500 {
             true => Some((*key, score)),
             false => None,
@@ -45,11 +43,11 @@ pub fn search(cb: &CodeBank, search_term: String, limit: usize) -> Vec<(Ustr, u6
     }
 }
 
-pub fn search_in_string(subject: &str, search_term: &str, re: &Regex) -> u64 {
-    let similarity = (similarity_algo(subject, search_term) * 1000.) as u64;
+pub fn search_in_string(subject: &str, search_term: &SearchTerm) -> u64 {
+    let similarity = (similarity_algo(subject, &search_term.normalized) * 1000.) as u64;
     match similarity > 500 {
-        true => match re.is_match(subject) {
-            true if search_term.len() == subject.len() => max(990, similarity),
+        true => match search_term.re.is_match(subject) {
+            true if search_term.normalized.len() == subject.len() => max(990, similarity),
             true => max(950, similarity),
             false => similarity,
         },
@@ -59,4 +57,44 @@ pub fn search_in_string(subject: &str, search_term: &str, re: &Regex) -> u64 {
 
 pub fn normalize(s: &str) -> String {
     deunicode::deunicode(s).to_lowercase()
+}
+
+#[derive(Debug)]
+pub struct SearchTerm {
+    pub raw: String,
+    pub normalized: String,
+    pub codes: Vec<Ustr>,
+    pub names: Vec<Ustr>,
+    pub without_codes: String,
+    pub re: Regex,
+}
+
+pub fn mk_search_term(raw: String) -> SearchTerm {
+    let normalized = normalize(&raw);
+    let re_str = format!(r"(?i)\b{}\b", normalized);
+    let re = Regex::new(&*re_str).unwrap();
+    let mut codes: Vec<Ustr> = vec![];
+    let mut names: Vec<Ustr> = vec![];
+    let mut without_codes: Vec<String> = vec![];
+    normalized
+        .split(" ")
+        .for_each(|w| match Ustr::from_existing(w) {
+            None => without_codes.push(w.to_string()),
+            Some(known_ustr) => match w.len() {
+                0 | 1 => {} // ignore
+                2 | 3 => codes.push(known_ustr),
+                _ => {
+                    names.push(known_ustr);
+                    without_codes.push(w.to_string())
+                }
+            },
+        });
+    SearchTerm {
+        re,
+        raw,
+        normalized,
+        codes,
+        names,
+        without_codes: without_codes.join(" "),
+    }
 }

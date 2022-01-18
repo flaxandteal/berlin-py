@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Read};
 use std::time::Instant;
 
 use serde_json::Value;
@@ -10,8 +10,8 @@ use tracing::{error, info};
 use berlin_core::json_decode::{AnyLocationCode, Location};
 use berlin_core::rayon::iter::IntoParallelIterator;
 use berlin_core::rayon::prelude::*;
-use berlin_core::search;
 use berlin_core::ustr::UstrMap;
+use berlin_core::{normalize, search};
 use berlin_web::init_logging;
 
 #[derive(StructOpt)]
@@ -52,19 +52,15 @@ fn main() {
                     match loc {
                         Ok(loc) => Some((loc.key, loc)),
                         Err(err) => {
-                            error!("Error for: {} {:?}", id, err);
+                            error!("Error for: {id} {err:?}");
                             None
                         }
                     }
                 });
-                info!(
-                    "{} decoded to native structs: {:.2?}",
-                    file,
-                    start.elapsed()
-                );
+                info!("{file} decoded to native structs: {:.2?}", start.elapsed());
                 codes
             }
-            other => panic!("Expected a JSON object: {:?}", other),
+            other => panic!("Expected a JSON object: {other:?}"),
         }
     });
     let codes: UstrMap<Location> = codes_vectors.flatten().collect();
@@ -76,10 +72,12 @@ fn main() {
     state.all = codes;
     loop {
         let inp: String = promptly::prompt("Search Term").expect("Search term expected");
+        let term = normalize(&inp);
+        error!("NORMALIZED TERM: {term}");
         let start = Instant::now();
-        let res = search(&state, inp, 10);
+        let res = search(&state, term, 3);
         for (i, (loc_key, score)) in res.iter().enumerate() {
-            info!("Result #{} {:?} score:{}", i, loc_key, score);
+            info!("Result #{i} {loc_key:?} score: {score}");
             info!("{:?}", &state.all.get(&loc_key).unwrap().data);
         }
         warn!("Search took {:.2?}", start.elapsed());

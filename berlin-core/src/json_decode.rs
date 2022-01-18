@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
+use deunicode::deunicode;
 use regex::Regex;
 use serde::de::Error;
 use serde::Deserialize;
 use strum_macros;
 use ustr::Ustr;
 
-use crate::search_in_string;
+use crate::{normalize, search_in_string};
 
 #[derive(Debug, Deserialize)]
 pub struct AnyLocationCode {
@@ -80,11 +81,11 @@ impl State {
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
         Ok(Self {
-            name: extract_field(&r, "name")?.into(),
-            short: extract_field(&r, "short")?.into(),
-            alpha2: extract_field(&r, "alpha2")?.into(),
-            alpha3: extract_field(&r, "alpha3")?.into(),
-            continent: extract_field(&r, "continent")?.into(),
+            name: normalize(extract_field(&r, "name")?).into(),
+            short: normalize(extract_field(&r, "short")?).into(),
+            alpha2: normalize(extract_field(&r, "alpha2")?).into(),
+            alpha3: normalize(extract_field(&r, "alpha3")?).into(),
+            continent: normalize(extract_field(&r, "continent")?).into(),
         })
     }
 }
@@ -104,10 +105,10 @@ impl Subdivision {
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
         Ok(Self {
-            name: extract_field(&r, "name")?.into(),
-            supercode: extract_field(&r, "supercode")?.into(),
-            subcode: extract_field(&r, "subcode")?.into(),
-            level: extract_field(&r, "level")?.into(),
+            name: normalize(extract_field(&r, "name")?).into(),
+            supercode: normalize(extract_field(&r, "supercode")?).into(),
+            subcode: normalize(extract_field(&r, "subcode")?).into(),
+            level: normalize(extract_field(&r, "level")?).into(),
         })
     }
 }
@@ -129,12 +130,14 @@ impl Locode {
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
         Ok(Self {
-            name: extract_field(&r, "name")?.into(),
-            supercode: extract_field(&r, "supercode")?.into(),
-            subcode: extract_field(&r, "subcode")?.into(),
-            subdivision_name: r.get("subdivision_name").map(|sd| sd.as_str().into()),
-            subdivision_code: r.get("subdivision_code").map(|sd| sd.as_str().into()),
-            function_code: extract_field(&r, "function_code")?.into(),
+            name: crate::normalize(extract_field(&r, "name")?).into(),
+            supercode: normalize(extract_field(&r, "supercode")?).into(),
+            subcode: normalize(extract_field(&r, "subcode")?).into(),
+            subdivision_name: r
+                .get("subdivision_name")
+                .map(|sd| crate::normalize(sd).into()),
+            subdivision_code: r.get("subdivision_code").map(|sd| normalize(sd).into()),
+            function_code: normalize(extract_field(&r, "function_code")?).into(),
         })
     }
 }
@@ -154,7 +157,7 @@ pub struct AirportRaw {
 
 #[derive(Debug)]
 pub struct Airport {
-    name: String,
+    name: Ustr,
     airport_type: Ustr,
     city: Option<Ustr>,
     country: Ustr,
@@ -171,11 +174,11 @@ impl Airport {
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let raw = serde_json::from_value::<AirportRaw>(r)?;
         Ok(Self {
-            name: raw.name,
+            name: normalize(&raw.name).into(),
+            city: raw.city.map(|c| normalize(&c).into()),
             airport_type: raw.airport_type.into(),
-            city: raw.city.map(|c| c.into()),
-            country: raw.country.into(),
-            region: raw.region.into(),
+            country: normalize(&raw.country).into(),
+            region: normalize(&raw.region).into(),
             x: raw.x,
             y: raw.y,
             elevation: raw.elevation,

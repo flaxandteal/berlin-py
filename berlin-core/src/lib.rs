@@ -1,5 +1,6 @@
 use std::cmp::max;
 
+pub use deunicode;
 pub use rayon;
 use rayon::prelude::*;
 use regex::Regex;
@@ -54,4 +55,8 @@ pub fn search_in_string(subject: &str, search_term: &str, re: &Regex) -> u64 {
         },
         false => similarity,
     }
+}
+
+pub fn normalize(s: &str) -> String {
+    deunicode::deunicode(s).to_lowercase()
 }

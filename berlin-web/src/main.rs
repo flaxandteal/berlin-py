@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::BufReader;
 use std::time::Instant;
 
 use serde_json::Value;
@@ -8,10 +8,10 @@ use tracing::log::warn;
 use tracing::{error, info};
 
 use berlin_core::json_decode::{AnyLocationCode, Location};
+use berlin_core::locations_db::LocationsDb;
 use berlin_core::rayon::iter::IntoParallelIterator;
 use berlin_core::rayon::prelude::*;
-use berlin_core::ustr::UstrMap;
-use berlin_core::{mk_search_term, normalize, search};
+use berlin_core::{mk_search_term, search};
 use berlin_web::init_logging;
 
 #[derive(StructOpt)]
@@ -33,7 +33,7 @@ fn main() {
     let caches = dirs::cache_dir().expect("caches dir not found");
     let app_cache = caches.join("berlin");
 
-    let mut db = berlin_core::CodeBank::default();
+    let mut db = LocationsDb::default();
     let start = Instant::now();
     let codes_vectors = files.into_par_iter().map(|file| {
         let path = app_cache.join(file);
@@ -50,7 +50,7 @@ fn main() {
                         .expect("Cannot decode location code");
                     let loc = Location::from_raw(raw_any);
                     match loc {
-                        Ok(loc) => Some((loc.key, loc)),
+                        Ok(loc) => Some(loc),
                         Err(err) => {
                             error!("Error for: {id} {err:?}");
                             None
@@ -63,24 +63,30 @@ fn main() {
             other => panic!("Expected a JSON object: {other:?}"),
         }
     });
-    let codes: UstrMap<Location> = codes_vectors.flatten().collect();
+    let locs: Vec<Location> = codes_vectors.flatten().collect();
+    for loc in locs {
+        db.insert(loc);
+    }
     info!(
-        "Flatten (allocate Vec) of {} elements: {:.2?}",
-        codes.len(),
+        "DB of {} locations in: {:.2?}",
+        db.all.len(),
         start.elapsed()
     );
-    db.all = codes;
     loop {
         let inp: String = promptly::prompt("Search Term").expect("Search term expected");
+        let start = Instant::now();
         let term = mk_search_term(inp);
-        // let term = normalize(&inp);
+        info!("Parse query in {:.3?}", start.elapsed());
         warn!("TERM: {term:#?}");
         let start = Instant::now();
-        let res = search(&db, term, 3);
+        let res = search(&db, term, 1);
         for (i, (loc_key, score)) in res.iter().enumerate() {
-            info!("Result #{i} {loc_key:?} score: {score}");
-            info!("{:?}", &db.all.get(&loc_key).unwrap().data);
+            info!(
+                "Result #{i} {loc_key:?} score: {score} {:?}",
+                &db.all.get(&loc_key).unwrap().data
+            );
         }
         warn!("Search took {:.2?}", start.elapsed());
+        println!("\n\n");
     }
 }

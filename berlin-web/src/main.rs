@@ -79,7 +79,7 @@ fn main() {
         info!("Parse query in {:.3?}", start.elapsed());
         warn!("TERM: {term:#?}");
         let start = Instant::now();
-        let res = search(&db, term, 1);
+        let res = search(&db, term, 5);
         for (i, (loc_key, score)) in res.iter().enumerate() {
             info!(
                 "Result #{i} {loc_key:?} score: {score} {:?}",

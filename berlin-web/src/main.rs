@@ -1,9 +1,16 @@
 use std::fs::File;
 use std::io::BufReader;
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
+use axum::extract::{Extension, Query};
+use axum::routing::get;
+use axum::{AddExtensionLayer, Json, Router};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use structopt::StructOpt;
+use tower_http::trace::TraceLayer;
 use tracing::log::warn;
 use tracing::{error, info};
 
@@ -22,23 +29,102 @@ struct CliArgs {
     interactive: bool,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = CliArgs::from_args();
     init_logging(args.log_level);
 
+    let caches = dirs::cache_dir().expect("caches dir not found");
+    let app_cache = caches.join("berlin");
+    let db = parse_json_files(app_cache);
+    if args.interactive {
+        loop {
+            cli_search_query(&db)
+        }
+    } else {
+        let db = Arc::new(db);
+        let app = Router::new()
+            .route("/search", get(search_handler))
+            .layer(AddExtensionLayer::new(db))
+            .layer(TraceLayer::new_for_http());
+        let addr = "0.0.0.0:3000";
+        info!("Will listen on {addr}");
+        axum::Server::bind(&addr.parse().unwrap())
+            .serve(app.into_make_service())
+            .await
+            .unwrap();
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchParams {
+    q: String,
+    limit: Option<usize>,
+}
+
+#[derive(Serialize)]
+struct SearchResults {
+    time: String,
+    results: Vec<SearchResult>,
+}
+
+#[derive(Serialize)]
+struct SearchResult {
+    loc: Location,
+    score: u64,
+}
+
+async fn search_handler(
+    Query(params): Query<SearchParams>,
+    Extension(state): Extension<Arc<LocationsDb>>,
+) -> Json<SearchResults> {
+    let start_time = Instant::now();
+    let limit = params.limit.unwrap_or(1);
+    let st = SearchTerm::from_raw_query(params.q);
+    let results = state
+        .search(st, limit)
+        .into_iter()
+        .map(|(key, score)| {
+            let loc: Location = state.all.get(&key).cloned().expect("loc should be in db");
+            SearchResult { loc, score }
+        })
+        .collect();
+    Json(SearchResults {
+        time: format!("{:.3?}", start_time.elapsed()),
+        results,
+    })
+}
+
+fn cli_search_query(db: &LocationsDb) {
+    let inp: String = promptly::prompt("Search Term").expect("Search term expected");
+    let start = Instant::now();
+    let term = SearchTerm::from_raw_query(inp);
+    info!("Parse query in {:.3?}", start.elapsed());
+    warn!("TERM: {term:#?}");
+    let start = Instant::now();
+    let res = db.search(term, 5);
+    for (i, (loc_key, score)) in res.iter().enumerate() {
+        info!(
+            "Result #{i} {loc_key:?} score: {score} {:?}",
+            &db.all.get(&loc_key).unwrap().data
+        );
+    }
+    warn!("Search took {:.2?}", start.elapsed());
+    println!("\n\n");
+}
+
+fn parse_json_files(app_cache_dir: PathBuf) -> LocationsDb {
     let files = vec![
         "berlin-state.json",
         "berlin-subdivision.json",
         "berlin-locode.json",
         "berlin-iata.json",
     ];
-    let caches = dirs::cache_dir().expect("caches dir not found");
-    let app_cache = caches.join("berlin");
-
-    let mut db = LocationsDb::default();
     let start = Instant::now();
-    let codes_vectors = files.into_par_iter().map(|file| {
-        let path = app_cache.join(file);
+    let db = LocationsDb::default();
+    let db = RwLock::new(db);
+    files.into_par_iter().for_each(|file| {
+        let path = app_cache_dir.join(file);
         info!("Path {path:?}");
         let fo = File::open(path).expect("cannot open json file");
         let reader = BufReader::new(fo);
@@ -47,50 +133,34 @@ fn main() {
         match json {
             Value::Object(obj) => {
                 let iter = obj.into_iter().par_bridge();
-                let codes = iter.filter_map(|(id, val)| {
-                    let raw_any = serde_json::from_value::<AnyLocation>(val)
-                        .expect("Cannot decode location code");
-                    let loc = Location::from_raw(raw_any);
-                    match loc {
-                        Ok(loc) => Some(loc),
-                        Err(err) => {
-                            error!("Error for: {id} {err:?}");
-                            None
+                let codes = iter
+                    .filter_map(|(id, val)| {
+                        let raw_any = serde_json::from_value::<AnyLocation>(val)
+                            .expect("Cannot decode location code");
+                        let loc = Location::from_raw(raw_any);
+                        match loc {
+                            Ok(loc) => Some(loc),
+                            Err(err) => {
+                                error!("Error for: {id} {err:?}");
+                                None
+                            }
                         }
-                    }
-                });
+                    })
+                    .for_each(|l| {
+                        let mut db = db.write().expect("cannot aquire lock");
+                        db.insert(l);
+                    });
                 info!("{file} decoded to native structs: {:.2?}", start.elapsed());
                 codes
             }
             other => panic!("Expected a JSON object: {other:?}"),
         }
     });
-    let locs: Vec<Location> = codes_vectors.flatten().collect();
-    for loc in locs {
-        db.insert(loc);
-    }
+    let db = db.into_inner().expect("rw lock extract");
     info!(
-        "DB of {} locations in: {:.2?}",
+        "parsed {} locations in: {:.2?}",
         db.all.len(),
         start.elapsed()
     );
-    if args.interactive {
-        loop {
-            let inp: String = promptly::prompt("Search Term").expect("Search term expected");
-            let start = Instant::now();
-            let term = SearchTerm::from_raw_query(inp);
-            info!("Parse query in {:.3?}", start.elapsed());
-            warn!("TERM: {term:#?}");
-            let start = Instant::now();
-            let res = db.search(term, 5);
-            for (i, (loc_key, score)) in res.iter().enumerate() {
-                info!(
-                    "Result #{i} {loc_key:?} score: {score} {:?}",
-                    &db.all.get(&loc_key).unwrap().data
-                );
-            }
-            warn!("Search took {:.2?}", start.elapsed());
-            println!("\n\n");
-        }
-    }
+    db
 }

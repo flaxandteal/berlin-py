@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ustr = { version = "0.8.1", features = ["serde"] }
+ustr = { version = "0.8.1", features = ["serde", "serialization"] }
 smallvec = "1.8.0"
 regex = "1.5.4"
 rayon = "1.5.1"

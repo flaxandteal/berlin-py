@@ -13,6 +13,7 @@ promptly = "0.3.0"
 serde = { version = "1.0.133", features = ["derive"] }
 serde_json = "1.0.74"
 
+
 # CLI args parsing
 structopt = "0.3.25"
 
@@ -21,3 +22,10 @@ tracing = "0.1.29"
 tracing-futures = "0.2.5"
 tracing-log = "0.1.2"
 tracing-subscriber = "0.3.1"
+
+# web server
+axum = { version = "0.4.4", feature = ["http2"] }
+hyper = { version = "0.14.16", features = ["full"] }
+tokio = { version = "1.15.0", features = ["full"] }
+tower = "0.4.11"
+tower-http = { version = "0.2.0", features = ["trace"] }

@@ -2,7 +2,7 @@ use std::cmp::max;
 use std::collections::HashMap;
 
 use serde::de::Error;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use ustr::Ustr;
 
 use crate::normalize;
@@ -16,9 +16,9 @@ pub struct AnyLocation {
     d: serde_json::Value,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Location {
-    pub key: Ustr, // encoding+id for usage as a key in hashmaps etc.
+    pub key: Ustr,
     pub encoding: Ustr,
     pub id: Ustr,
     pub data: LocData,
@@ -79,7 +79,7 @@ impl Location {
     }
 }
 
-#[derive(Debug, strum_macros::Display)]
+#[derive(Debug, Serialize, Clone)]
 pub enum LocData {
     St(State),
     Subdv(Subdivision),
@@ -87,7 +87,7 @@ pub enum LocData {
     Airp(Airport),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct State {
     name: Ustr,
     short: Ustr,
@@ -123,7 +123,7 @@ impl State {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Subdivision {
     name: Ustr,
     supercode: Ustr,
@@ -155,7 +155,7 @@ impl Subdivision {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Locode {
     name: Ustr,
     supercode: Ustr,
@@ -212,7 +212,7 @@ pub struct AirportRaw {
     elevation: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Airport {
     name: Ustr,
     airport_type: Ustr,

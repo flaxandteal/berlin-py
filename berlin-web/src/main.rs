@@ -65,6 +65,7 @@ struct SearchParams {
 #[derive(Serialize)]
 struct SearchResults {
     time: String,
+    query: SearchTerm,
     results: Vec<SearchResult>,
 }
 
@@ -82,7 +83,7 @@ async fn search_handler(
     let limit = params.limit.unwrap_or(1);
     let st = SearchTerm::from_raw_query(params.q);
     let results = state
-        .search(st, limit)
+        .search(&st, limit)
         .into_iter()
         .map(|(key, score)| {
             let loc: Location = state.all.get(&key).cloned().expect("loc should be in db");
@@ -91,6 +92,7 @@ async fn search_handler(
         .collect();
     Json(SearchResults {
         time: format!("{:.3?}", start_time.elapsed()),
+        query: st,
         results,
     })
 }
@@ -102,7 +104,7 @@ fn cli_search_query(db: &LocationsDb) {
     info!("Parse query in {:.3?}", start.elapsed());
     warn!("TERM: {term:#?}");
     let start = Instant::now();
-    let res = db.search(term, 5);
+    let res = db.search(&term, 5);
     for (i, (loc_key, score)) in res.iter().enumerate() {
         info!(
             "Result #{i} {loc_key:?} score: {score} {:?}",

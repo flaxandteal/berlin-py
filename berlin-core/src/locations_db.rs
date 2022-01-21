@@ -80,7 +80,7 @@ impl LocationsDb {
         boosted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
         boosted
     }
-    pub fn search(&self, st: SearchTerm, limit: usize) -> Vec<(Ustr, u64)> {
+    pub fn search(&self, st: &SearchTerm, limit: usize) -> Vec<(Ustr, u64)> {
         let locations_by_code = self.find_by_names(&st.codes);
         let codes = locations_by_code
             .iter()

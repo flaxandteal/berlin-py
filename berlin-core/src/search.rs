@@ -1,22 +1,23 @@
+use serde::Serialize;
 use strsim::jaro_winkler as similarity_algo;
 use ustr::Ustr;
 
 use crate::SCORE_SOFT_MAX;
 
-#[derive(Debug, Default)]
-pub struct NGrams<T> {
-    pub(crate) words: Vec<T>,
-    pub(crate) doublets: Vec<T>,
-    pub(crate) triplets: Vec<T>,
+#[derive(Debug, Default, Serialize)]
+pub struct NGrams {
+    pub(crate) words: Vec<String>,
+    pub(crate) doublets: Vec<String>,
+    pub(crate) triplets: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct SearchTerm {
     pub raw: String,
     pub normalized: String,
     pub codes: Vec<Ustr>,
     pub exact_matches: Vec<Ustr>,
-    pub not_exact_matches: NGrams<String>,
+    pub not_exact_matches: NGrams,
 }
 
 impl SearchTerm {
@@ -24,7 +25,7 @@ impl SearchTerm {
         let normalized = crate::normalize(&raw);
         let mut codes: Vec<Ustr> = vec![];
         let mut exact_matches: Vec<Ustr> = Vec::default();
-        let mut not_exact_matches: NGrams<String> = NGrams::default();
+        let mut not_exact_matches: NGrams = NGrams::default();
         let split_words = normalized.split(" ").collect::<Vec<_>>();
         for (i, w) in split_words.iter().enumerate() {
             if split_words.len() > i + 1 {

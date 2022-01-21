@@ -3,13 +3,13 @@ use std::collections::HashMap;
 
 use serde::de::Error;
 use serde::Deserialize;
-use strum_macros;
 use ustr::Ustr;
 
-use crate::{normalize, search_in_string, SearchTerm};
+use crate::normalize;
+use crate::search::SearchTerm;
 
 #[derive(Debug, Deserialize)]
-pub struct AnyLocationCode {
+pub struct AnyLocation {
     #[serde(rename = "<c>")]
     pub c: String,
     i: String,
@@ -18,15 +18,14 @@ pub struct AnyLocationCode {
 
 #[derive(Debug)]
 pub struct Location {
-    pub key: Ustr,
-    // Unified encoding+id Ustr for convenient usage as a key in hashmaps etc.
+    pub key: Ustr, // encoding+id for usage as a key in hashmaps etc.
     pub encoding: Ustr,
     pub id: Ustr,
     pub data: LocData,
 }
 
 impl Location {
-    pub fn from_raw(r: AnyLocationCode) -> serde_json::Result<Self> {
+    pub fn from_raw(r: AnyLocation) -> serde_json::Result<Self> {
         let encoding: Ustr = r.c.as_str().into();
         let data = match r.c.as_str() {
             "ISO-3166-1" => LocData::St(State::from_raw(r.d)?),
@@ -110,10 +109,7 @@ impl State {
             .any(|f| f == &code)
     }
     fn search(&self, t: &SearchTerm) -> u64 {
-        max(
-            search_in_string(&self.name, t),
-            search_in_string(&self.short, t),
-        )
+        max(t.match_str(&self.name), t.match_str(&self.short))
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -146,7 +142,7 @@ impl Subdivision {
         [self.supercode, self.subcode].iter().any(|f| f == &code)
     }
     fn search(&self, t: &SearchTerm) -> u64 {
-        search_in_string(&self.name, t)
+        t.match_str(&self.name)
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -186,7 +182,7 @@ impl Locode {
         codes.iter().any(|f| f == &code)
     }
     fn search(&self, t: &SearchTerm) -> u64 {
-        search_in_string(&self.name, t)
+        t.match_str(&self.name)
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -240,8 +236,8 @@ impl Airport {
     }
     fn search(&self, t: &SearchTerm) -> u64 {
         max(
-            search_in_string(&self.name, t),
-            self.city.map(|c| search_in_string(&c, t)).unwrap_or(0),
+            t.match_str(&self.name),
+            self.city.map(|c| t.match_str(&c)).unwrap_or(0),
         )
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {

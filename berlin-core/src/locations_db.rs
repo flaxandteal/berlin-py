@@ -1,7 +1,12 @@
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use smallvec::{smallvec, SmallVec};
 use ustr::{Ustr, UstrMap, UstrSet};
 
-use crate::Location;
+use crate::location::Location;
+use crate::search::SearchTerm;
+use crate::{LOC_CODE_BOOST, SCORE_SOFT_MAX, SEARCH_INCLUSION_THRESHOLD};
+
+const MAX_RESULTS_COUNT: usize = 1000;
 
 #[derive(Default)]
 pub struct LocationsDb {
@@ -40,7 +45,7 @@ impl LocationsDb {
             Some(s) => s.clone(),
         }
     }
-    pub fn find_by_name_many(&self, names: &[Ustr]) -> Vec<Ustr> {
+    pub fn find_by_names(&self, names: &[Ustr]) -> Vec<Ustr> {
         names
             .iter()
             .map(|c| self.find_by_name(c))
@@ -62,11 +67,10 @@ impl LocationsDb {
             .into_iter()
             .map(|(key, score)| {
                 let loc = self.all.get(&key).expect("should be in the db");
-                // info!("{:#?}", loc);
                 let matches: u64 = codes
                     .iter()
                     .map(|code| match loc.code_match(*code) {
-                        true => 1,
+                        true => LOC_CODE_BOOST,
                         false => 0,
                     })
                     .sum();
@@ -75,5 +79,38 @@ impl LocationsDb {
             .collect();
         boosted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
         boosted
+    }
+    pub fn search(&self, st: SearchTerm, limit: usize) -> Vec<(Ustr, u64)> {
+        let locations_by_code = self.find_by_names(&st.codes);
+        let codes = locations_by_code
+            .iter()
+            .map(|l| self.get_codes(l))
+            .flatten()
+            .collect::<UstrSet>();
+        let exact_locations = self
+            .find_by_names(&st.exact_matches)
+            .into_iter()
+            .map(|l| (l, SCORE_SOFT_MAX))
+            .collect::<Vec<_>>();
+        let mut exact_locations = self.boost_by_codes(exact_locations, &codes);
+        if exact_locations.len() >= limit {
+            exact_locations.truncate(limit);
+            return exact_locations;
+        }
+        let res = self.all.par_iter().filter_map(|(key, loc)| {
+            let score = loc.search(&st);
+            match score > SEARCH_INCLUSION_THRESHOLD {
+                true => Some((*key, score)),
+                false => None,
+            }
+        });
+        let mut res = res.collect::<Vec<_>>();
+        res.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        res.truncate(MAX_RESULTS_COUNT);
+        let res = self.boost_by_codes(res, &codes);
+        exact_locations.extend(res);
+        exact_locations.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        exact_locations.truncate(limit);
+        exact_locations
     }
 }

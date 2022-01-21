@@ -7,17 +7,19 @@ use structopt::StructOpt;
 use tracing::log::warn;
 use tracing::{error, info};
 
-use berlin_core::json_decode::{AnyLocationCode, Location};
+use berlin_core::location::{AnyLocation, Location};
 use berlin_core::locations_db::LocationsDb;
 use berlin_core::rayon::iter::IntoParallelIterator;
 use berlin_core::rayon::prelude::*;
-use berlin_core::{mk_search_term, search};
+use berlin_core::search::SearchTerm;
 use berlin_web::init_logging;
 
 #[derive(StructOpt)]
 struct CliArgs {
     #[structopt(long = "log-level", case_insensitive = true, default_value = "INFO")]
     log_level: tracing::Level,
+    #[structopt(long = "interactive", short = "i")]
+    interactive: bool,
 }
 
 fn main() {
@@ -46,7 +48,7 @@ fn main() {
             Value::Object(obj) => {
                 let iter = obj.into_iter().par_bridge();
                 let codes = iter.filter_map(|(id, val)| {
-                    let raw_any = serde_json::from_value::<AnyLocationCode>(val)
+                    let raw_any = serde_json::from_value::<AnyLocation>(val)
                         .expect("Cannot decode location code");
                     let loc = Location::from_raw(raw_any);
                     match loc {
@@ -72,21 +74,23 @@ fn main() {
         db.all.len(),
         start.elapsed()
     );
-    loop {
-        let inp: String = promptly::prompt("Search Term").expect("Search term expected");
-        let start = Instant::now();
-        let term = mk_search_term(inp);
-        info!("Parse query in {:.3?}", start.elapsed());
-        warn!("TERM: {term:#?}");
-        let start = Instant::now();
-        let res = search(&db, term, 5);
-        for (i, (loc_key, score)) in res.iter().enumerate() {
-            info!(
-                "Result #{i} {loc_key:?} score: {score} {:?}",
-                &db.all.get(&loc_key).unwrap().data
-            );
+    if args.interactive {
+        loop {
+            let inp: String = promptly::prompt("Search Term").expect("Search term expected");
+            let start = Instant::now();
+            let term = SearchTerm::from_raw_query(inp);
+            info!("Parse query in {:.3?}", start.elapsed());
+            warn!("TERM: {term:#?}");
+            let start = Instant::now();
+            let res = db.search(term, 5);
+            for (i, (loc_key, score)) in res.iter().enumerate() {
+                info!(
+                    "Result #{i} {loc_key:?} score: {score} {:?}",
+                    &db.all.get(&loc_key).unwrap().data
+                );
+            }
+            warn!("Search took {:.2?}", start.elapsed());
+            println!("\n\n");
         }
-        warn!("Search took {:.2?}", start.elapsed());
-        println!("\n\n");
     }
 }

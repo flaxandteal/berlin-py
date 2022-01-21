@@ -1,3 +1,4 @@
+use std::env;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -34,9 +35,10 @@ async fn main() {
     let args = CliArgs::from_args();
     init_logging(args.log_level);
 
-    let caches = dirs::cache_dir().expect("caches dir not found");
-    let app_cache = caches.join("berlin");
-    let db = parse_json_files(app_cache);
+    let current_dir = env::current_dir().expect("get current directory");
+    let data_dir = current_dir.join("data");
+    let db = parse_json_files(data_dir);
+
     if args.interactive {
         loop {
             cli_search_query(&db)
@@ -115,18 +117,13 @@ fn cli_search_query(db: &LocationsDb) {
     println!("\n\n");
 }
 
-fn parse_json_files(app_cache_dir: PathBuf) -> LocationsDb {
-    let files = vec![
-        "berlin-state.json",
-        "berlin-subdivision.json",
-        "berlin-locode.json",
-        "berlin-iata.json",
-    ];
+fn parse_json_files(data_dir: PathBuf) -> LocationsDb {
+    let files = vec!["state.json", "subdivision.json", "locode.json", "iata.json"];
     let start = Instant::now();
     let db = LocationsDb::default();
     let db = RwLock::new(db);
     files.into_par_iter().for_each(|file| {
-        let path = app_cache_dir.join(file);
+        let path = data_dir.join(file);
         info!("Path {path:?}");
         let fo = File::open(path).expect("cannot open json file");
         let reader = BufReader::new(fo);

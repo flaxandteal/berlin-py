@@ -46,7 +46,10 @@ impl SearchTerm {
                 None => not_exact_matches.words.push(w.to_string()),
                 Some(known_ustr) => match w.len() {
                     0 | 1 => {} // ignore
-                    2 | 3 => codes.push(known_ustr),
+                    2 | 3 => {
+                        codes.push(known_ustr);
+                        exact_matches.push(known_ustr)
+                    }
                     _ => {
                         exact_matches.push(known_ustr);
                     }

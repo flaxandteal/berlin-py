@@ -16,7 +16,29 @@ pub struct AnyLocation {
     d: serde_json::Value,
 }
 
-#[derive(Debug, Serialize, Clone)]
+const STATE_ENCODING: &str = "ISO-3166-1";
+
+pub fn state_key(state_code: Ustr) -> Option<Ustr> {
+    let str = format!("{}#{}", STATE_ENCODING, state_code.as_str());
+    Ustr::from_existing(str.as_str())
+}
+
+const SUBDIV_ENCODING: &str = "ISO-3166-2";
+
+pub fn subdiv_key(state_code: Ustr, subdiv_code: Ustr) -> Option<Ustr> {
+    let str = format!(
+        "{}#{}:{}",
+        SUBDIV_ENCODING,
+        state_code.as_str(),
+        subdiv_code.as_str()
+    );
+    Ustr::from_existing(str.as_str())
+}
+
+const LOCODE_ENCODING: &str = "UN-LOCODE";
+const IATA_ENCODING: &str = "IATA";
+
+#[derive(Debug, Serialize, Clone, Copy)]
 pub struct Location {
     pub key: Ustr,
     pub encoding: Ustr,
@@ -27,17 +49,17 @@ pub struct Location {
 impl Location {
     pub fn from_raw(r: AnyLocation) -> serde_json::Result<Self> {
         let encoding: Ustr = r.c.as_str().into();
-        let data = match r.c.as_str() {
-            "ISO-3166-1" => LocData::St(State::from_raw(r.d)?),
-            "ISO-3166-2" => LocData::Subdv(Subdivision::from_raw(r.d)?),
-            "UN-LOCODE" => LocData::Locd(Locode::from_raw(r.d)?),
-            "IATA" => LocData::Airp(Airport::from_raw(r.d)?),
-            standard => {
-                panic!("Unexpected location standard {}", standard)
+        let data = match encoding.as_str() {
+            STATE_ENCODING => LocData::St(State::from_raw(r.d)?),
+            SUBDIV_ENCODING => LocData::Subdv(Subdivision::from_raw(r.d)?),
+            LOCODE_ENCODING => LocData::Locd(Locode::from_raw(r.d)?),
+            IATA_ENCODING => LocData::Airp(Airport::from_raw(r.d)?),
+            other => {
+                panic!("Unexpected location standard {}", other)
             }
         };
         let id: Ustr = r.i.into();
-        let key = format!("{}#{}", encoding.as_str(), id.as_str());
+        let key = format!("{}#{}", encoding.as_str(), normalize(id.as_str()));
         Ok(Self {
             key: Ustr::from(&key),
             id,
@@ -79,7 +101,7 @@ impl Location {
     }
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Copy)]
 pub enum LocData {
     St(State),
     Subdv(Subdivision),
@@ -87,11 +109,30 @@ pub enum LocData {
     Airp(Airport),
 }
 
-#[derive(Debug, Clone, Serialize)]
+impl LocData {
+    pub fn get_state(&self) -> Ustr {
+        match self {
+            LocData::St(s) => s.alpha2,
+            LocData::Subdv(sd) => sd.supercode,
+            LocData::Locd(l) => l.supercode,
+            LocData::Airp(a) => a.country,
+        }
+    }
+    pub fn get_subdiv(&self) -> Option<Ustr> {
+        match self {
+            LocData::St(_) => None,
+            LocData::Subdv(sd) => Some(sd.subcode),
+            LocData::Locd(l) => l.subdivision_code,
+            LocData::Airp(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Serialize)]
 pub struct State {
     name: Ustr,
     short: Ustr,
-    alpha2: Ustr,
+    pub(crate) alpha2: Ustr,
     alpha3: Ustr,
     continent: Ustr,
 }
@@ -101,7 +142,7 @@ impl State {
         vec![self.name, self.short, self.alpha2, self.alpha3]
     }
     fn get_codes(&self) -> Vec<Ustr> {
-        vec![self.short, self.alpha2, self.alpha3]
+        vec![self.alpha2, self.alpha3]
     }
     fn code_match(&self, code: Ustr) -> bool {
         [self.short, self.alpha2, self.alpha3]
@@ -109,7 +150,11 @@ impl State {
             .any(|f| f == &code)
     }
     fn search(&self, t: &SearchTerm) -> u64 {
-        max(t.match_str(&self.name), t.match_str(&self.short))
+        self.get_names()
+            .iter()
+            .map(|n| t.match_str(n))
+            .max()
+            .unwrap_or(0)
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -123,15 +168,27 @@ impl State {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Hash, Eq, PartialEq)]
+pub struct SubDivKey {
+    pub(crate) state: Ustr,
+    pub(crate) subcode: Ustr,
+}
+
+#[derive(Debug, Copy, Clone, Serialize)]
 pub struct Subdivision {
     name: Ustr,
-    supercode: Ustr,
-    subcode: Ustr,
+    pub(crate) supercode: Ustr,
+    pub(crate) subcode: Ustr,
     level: Ustr,
 }
 
 impl Subdivision {
+    pub fn subdiv_key(&self) -> SubDivKey {
+        SubDivKey {
+            state: self.supercode,
+            subcode: self.subcode,
+        }
+    }
     fn get_names(&self) -> Vec<Ustr> {
         vec![self.name, self.subcode]
     }
@@ -142,7 +199,7 @@ impl Subdivision {
         [self.supercode, self.subcode].iter().any(|f| f == &code)
     }
     fn search(&self, t: &SearchTerm) -> u64 {
-        t.match_str(&self.name)
+        max(t.match_str(&self.name), t.match_str(&self.subcode))
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -155,14 +212,14 @@ impl Subdivision {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Copy, Clone, Serialize)]
 pub struct Locode {
     name: Ustr,
-    supercode: Ustr,
-    subcode: Ustr,
+    pub(crate) supercode: Ustr,
+    pub(crate) subcode: Ustr,
     subdivision_name: Option<Ustr>,
-    subdivision_code: Option<Ustr>,
-    function_code: Ustr,
+    pub(crate) subdivision_code: Option<Ustr>,
+    pub(crate) function_code: Ustr,
 }
 
 impl Locode {
@@ -199,9 +256,10 @@ impl Locode {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct AirportRaw {
     name: String,
+    iata: String,
     #[serde(rename = "type")]
     airport_type: String,
     city: Option<String>,
@@ -212,16 +270,17 @@ pub struct AirportRaw {
     elevation: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Copy, Clone, Serialize)]
 pub struct Airport {
     name: Ustr,
+    iata: Ustr,
     airport_type: Ustr,
     city: Option<Ustr>,
-    country: Ustr,
+    pub(crate) country: Ustr,
     region: Ustr,
     x: f64,
     y: f64,
-    elevation: Option<String>,
+    elevation: Option<i16>,
 }
 
 impl Airport {
@@ -235,22 +294,25 @@ impl Airport {
         self.country == code
     }
     fn search(&self, t: &SearchTerm) -> u64 {
-        max(
-            t.match_str(&self.name),
-            self.city.map(|c| t.match_str(&c)).unwrap_or(0),
-        )
+        t.match_str(&self.name)
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let raw = serde_json::from_value::<AirportRaw>(r)?;
+        let airport_type = Ustr::from(&raw.airport_type);
+        let elevation = raw
+            .elevation
+            .as_ref()
+            .map(|e| e.parse::<i16>().expect("parse elevation"));
         Ok(Self {
             name: normalize(&raw.name).into(),
+            iata: normalize(&raw.iata).into(),
             city: raw.city.map(|c| normalize(&c).into()),
-            airport_type: raw.airport_type.into(),
+            airport_type,
             country: normalize(&raw.country).into(),
             region: normalize(&raw.region).into(),
             x: raw.x,
             y: raw.y,
-            elevation: raw.elevation,
+            elevation,
         })
     }
 }

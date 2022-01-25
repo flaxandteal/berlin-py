@@ -1,6 +1,7 @@
 pub use deunicode;
 pub use rayon;
 
+mod graph;
 pub mod location;
 pub mod locations_db;
 pub mod search;

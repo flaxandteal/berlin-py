@@ -1,7 +1,9 @@
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use smallvec::{smallvec, SmallVec};
+use tracing::info;
 use ustr::{Ustr, UstrMap, UstrSet};
 
+use crate::graph::ResultsGraph;
 use crate::location::Location;
 use crate::search::SearchTerm;
 use crate::{LOC_CODE_BOOST, SCORE_SOFT_MAX, SEARCH_INCLUSION_THRESHOLD};
@@ -11,7 +13,8 @@ const MAX_RESULTS_COUNT: usize = 1000;
 #[derive(Default)]
 pub struct LocationsDb {
     pub all: UstrMap<Location>,
-    pub names_registry: UstrMap<SmallVec<[Ustr; 4]>>, // the values are references to self.all keys
+    // name to loc key
+    pub names_registry: UstrMap<SmallVec<[Ustr; 4]>>,
 }
 
 impl LocationsDb {
@@ -93,10 +96,11 @@ impl LocationsDb {
             .map(|l| (l, SCORE_SOFT_MAX))
             .collect::<Vec<_>>();
         let mut exact_locations = self.boost_by_codes(exact_locations, &codes);
-        if exact_locations.len() >= limit {
-            exact_locations.truncate(limit);
-            return exact_locations;
-        }
+        info!("Exact locations: {}", exact_locations.len());
+        // if exact_locations.len() >= limit {
+        //     exact_locations.truncate(limit);
+        //     return exact_locations;
+        // }
         let res = self.all.par_iter().filter_map(|(key, loc)| {
             let score = loc.search(&st);
             match score > SEARCH_INCLUSION_THRESHOLD {
@@ -108,9 +112,15 @@ impl LocationsDb {
         res.sort_unstable_by(|a, b| b.1.cmp(&a.1));
         res.truncate(MAX_RESULTS_COUNT);
         let res = self.boost_by_codes(res, &codes);
-        exact_locations.extend(res);
-        exact_locations.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-        exact_locations.truncate(limit);
-        exact_locations
+        let mut res: UstrMap<_> = res.into_iter().collect();
+        res.extend(exact_locations.into_iter().collect::<UstrMap<_>>());
+        // exact_locations.extend(res);
+        // exact_locations.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        // exact_locations.truncate(MAX_RESULTS_COUNT);
+        let mut res: Vec<_> = res.into_iter().collect();
+        let res_graph = ResultsGraph::from_results(&res, &self);
+        res.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        res.truncate(limit);
+        res
     }
 }

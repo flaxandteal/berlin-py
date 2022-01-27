@@ -67,7 +67,7 @@ impl Location {
             data,
         })
     }
-    pub fn search(&self, term: &SearchTerm) -> u64 {
+    pub fn search(&self, term: &SearchTerm) -> i64 {
         match &self.data {
             LocData::St(d) => d.search(term),
             LocData::Subdv(d) => d.search(term),
@@ -149,7 +149,7 @@ impl State {
             .iter()
             .any(|f| f == &code)
     }
-    fn search(&self, t: &SearchTerm) -> u64 {
+    fn search(&self, t: &SearchTerm) -> i64 {
         self.get_names()
             .iter()
             .map(|n| t.match_str(n))
@@ -198,7 +198,7 @@ impl Subdivision {
     fn code_match(&self, code: Ustr) -> bool {
         [self.supercode, self.subcode].iter().any(|f| f == &code)
     }
-    fn search(&self, t: &SearchTerm) -> u64 {
+    fn search(&self, t: &SearchTerm) -> i64 {
         max(t.match_str(&self.name), t.match_str(&self.subcode))
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
@@ -238,7 +238,7 @@ impl Locode {
         codes.push(self.supercode);
         codes.iter().any(|f| f == &code)
     }
-    fn search(&self, t: &SearchTerm) -> u64 {
+    fn search(&self, t: &SearchTerm) -> i64 {
         t.match_str(&self.name)
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
@@ -293,7 +293,7 @@ impl Airport {
     fn code_match(&self, code: Ustr) -> bool {
         self.country == code
     }
-    fn search(&self, t: &SearchTerm) -> u64 {
+    fn search(&self, t: &SearchTerm) -> i64 {
         t.match_str(&self.name)
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {

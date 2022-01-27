@@ -6,18 +6,27 @@ use ustr::{Ustr, UstrMap, UstrSet};
 use crate::graph::ResultsGraph;
 use crate::location::Location;
 use crate::search::SearchTerm;
-use crate::{LOC_CODE_BOOST, SCORE_SOFT_MAX, SEARCH_INCLUSION_THRESHOLD};
+use crate::{LOC_CODE_BOOST, SCORE_SOFT_MAX, SEARCH_INCLUSION_THRESHOLD, STOP_WORDS_PENALTY};
 
 const MAX_RESULTS_COUNT: usize = 1000;
 
-#[derive(Default)]
 pub struct LocationsDb {
+    pub stop_words_english: UstrSet,
     pub all: UstrMap<Location>,
     // name to loc key
     pub names_registry: UstrMap<SmallVec<[Ustr; 4]>>,
 }
 
 impl LocationsDb {
+    pub fn new() -> Self {
+        let sw = stop_words::get(stop_words::LANGUAGE::English);
+        let sw = sw.iter().map(|w| w.as_str().into()).collect();
+        LocationsDb {
+            stop_words_english: sw,
+            all: Default::default(),
+            names_registry: Default::default(),
+        }
+    }
     pub fn insert(&mut self, l: Location) {
         let mut loc_names = l.get_names();
         let loc_words: Vec<Ustr> = loc_names
@@ -63,27 +72,29 @@ impl LocationsDb {
     }
     pub fn boost_by_codes(
         &self,
-        search_results: Vec<(Ustr, u64)>,
-        codes: &UstrSet,
-    ) -> Vec<(Ustr, u64)> {
-        let mut boosted: Vec<(Ustr, u64)> = search_results
+        search_results: Vec<(Ustr, i64)>,
+        st: &SearchTerm,
+    ) -> Vec<(Ustr, i64)> {
+        let mut boosted: Vec<(Ustr, i64)> = search_results
             .into_iter()
             .map(|(key, score)| {
                 let loc = self.all.get(&key).expect("should be in the db");
-                let matches: u64 = codes
+                let boost: i64 = st
+                    .codes
                     .iter()
                     .map(|code| match loc.code_match(*code) {
+                        true if st.str_in_stop_words(code) => LOC_CODE_BOOST - STOP_WORDS_PENALTY,
                         true => LOC_CODE_BOOST,
                         false => 0,
                     })
                     .sum();
-                (key, score + matches)
+                (key, score + boost)
             })
             .collect();
         boosted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
         boosted
     }
-    pub fn search(&self, st: &SearchTerm, limit: usize) -> Vec<(Ustr, u64)> {
+    pub fn search(&self, st: &SearchTerm, limit: usize) -> Vec<(Ustr, i64)> {
         let locations_by_code = self.find_by_names(&st.codes);
         let codes = locations_by_code
             .iter()
@@ -95,7 +106,7 @@ impl LocationsDb {
             .into_iter()
             .map(|l| (l, SCORE_SOFT_MAX))
             .collect::<Vec<_>>();
-        let mut exact_locations = self.boost_by_codes(exact_locations, &codes);
+        let exact_locations = self.boost_by_codes(exact_locations, st);
         info!("Exact locations: {}", exact_locations.len());
         // if exact_locations.len() >= limit {
         //     exact_locations.truncate(limit);
@@ -111,7 +122,7 @@ impl LocationsDb {
         let mut res = res.collect::<Vec<_>>();
         res.sort_unstable_by(|a, b| b.1.cmp(&a.1));
         res.truncate(MAX_RESULTS_COUNT);
-        let res = self.boost_by_codes(res, &codes);
+        let res = self.boost_by_codes(res, st);
         let mut res: UstrMap<_> = res.into_iter().collect();
         res.extend(exact_locations.into_iter().collect::<UstrMap<_>>());
         // exact_locations.extend(res);

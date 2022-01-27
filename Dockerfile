@@ -16,7 +16,7 @@ COPY . .
 RUN cargo build --release
 
 # We do not need the Rust toolchain to run the binary
-FROM debian:bullseye-slim AS nft
+FROM debian:bullseye-slim
 WORKDIR app
 COPY --from=builder /app/target/release/berlin-web .
 COPY --from=builder /app/data/ ./data/

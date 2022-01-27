@@ -1,8 +1,9 @@
 use serde::Serialize;
 use strsim::jaro_winkler as similarity_algo;
-use ustr::Ustr;
+use ustr::{Ustr, UstrSet};
 
-use crate::SCORE_SOFT_MAX;
+use crate::locations_db::LocationsDb;
+use crate::{SCORE_SOFT_MAX, STOP_WORDS_PENALTY};
 
 #[derive(Debug, Default, Serialize)]
 pub struct NGrams {
@@ -15,18 +16,25 @@ pub struct NGrams {
 pub struct SearchTerm {
     pub raw: String,
     pub normalized: String,
+    pub stop_words: Vec<Ustr>,
     pub codes: Vec<Ustr>,
     pub exact_matches: Vec<Ustr>,
     pub not_exact_matches: NGrams,
 }
 
 impl SearchTerm {
-    pub fn from_raw_query(raw: String) -> Self {
+    pub fn from_raw_query(raw: String, db: &LocationsDb) -> Self {
         let normalized = crate::normalize(&raw);
         let mut codes: Vec<Ustr> = vec![];
         let mut exact_matches: Vec<Ustr> = Vec::default();
         let mut not_exact_matches: NGrams = NGrams::default();
         let split_words = normalized.split(" ").collect::<Vec<_>>();
+        let stop_words = split_words
+            .iter()
+            .filter_map(|w| Ustr::from_existing(w).filter(|w| db.stop_words_english.contains(w)))
+            .collect::<UstrSet>()
+            .into_iter()
+            .collect();
         for (i, w) in split_words.iter().enumerate() {
             if split_words.len() > i + 1 {
                 let doublet: String = [w, split_words[i + 1]].join(" ");
@@ -60,14 +68,15 @@ impl SearchTerm {
         SearchTerm {
             raw,
             normalized,
+            stop_words,
             codes,
             exact_matches,
             not_exact_matches,
         }
     }
-    pub fn match_str(&self, subject: &str) -> u64 {
+    pub fn match_str(&self, subject: &str) -> i64 {
         let words_count = subject.split(" ").count();
-        match self.exact_matches.iter().any(|m| m == &subject) {
+        let score = match self.exact_matches.iter().any(|m| m == &subject) {
             true => SCORE_SOFT_MAX,
             false => match words_count {
                 0 => 0,
@@ -77,7 +86,7 @@ impl SearchTerm {
                     .iter()
                     .map(
                         |w| match w.len() > subject.len() - 2 && w.len() < subject.len() + 2 {
-                            true => (similarity_algo(subject, &w) * SCORE_SOFT_MAX as f64) as u64,
+                            true => (similarity_algo(subject, &w) * SCORE_SOFT_MAX as f64) as i64,
                             false => 0,
                         },
                     )
@@ -86,14 +95,21 @@ impl SearchTerm {
                 2 => max_match(subject, &self.not_exact_matches.doublets),
                 _ => max_match(subject, &self.not_exact_matches.triplets),
             },
+        };
+        match self.stop_words.iter().any(|sw| sw == &subject) {
+            true => score - STOP_WORDS_PENALTY,
+            false => score,
         }
+    }
+    pub fn str_in_stop_words(&self, s: &str) -> bool {
+        self.stop_words.iter().any(|sw| sw == &s)
     }
 }
 
-fn max_match(subject: &str, terms: &[String]) -> u64 {
+fn max_match(subject: &str, terms: &[String]) -> i64 {
     terms
         .iter()
-        .map(|w| ((similarity_algo(subject, &w) * SCORE_SOFT_MAX as f64) as u64))
+        .map(|w| ((similarity_algo(subject, &w) * SCORE_SOFT_MAX as f64) as i64))
         .max()
         .unwrap_or(0)
 }

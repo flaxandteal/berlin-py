@@ -4,18 +4,18 @@ use petgraph::graphmap::DiGraphMap;
 use tracing::info;
 use ustr::{Ustr, UstrMap};
 
-use crate::location::{state_key, subdiv_key, LocData, Location};
+use crate::location::{state_key, subdiv_key, LocData};
 use crate::locations_db::LocationsDb;
 
 pub struct ResultsGraph {
-    scores: UstrMap<u64>,
-    locs: DiGraphMap<Ustr, u64>,
+    scores: UstrMap<i64>,
+    locs: DiGraphMap<Ustr, i64>,
 }
 
 impl ResultsGraph {
-    pub fn from_results(results: &[(Ustr, u64)], db: &LocationsDb) -> Self {
+    pub fn from_results(results: &[(Ustr, i64)], db: &LocationsDb) -> Self {
         let start = Instant::now();
-        let scores: UstrMap<u64> = results.iter().map(|(key, s)| (*key, *s)).collect();
+        let scores: UstrMap<i64> = results.iter().map(|(key, s)| (*key, *s)).collect();
         let mut graph: DiGraphMap<Ustr, _> = DiGraphMap::new();
         results.iter().for_each(|(key, score)| {
             let loc = db.all.get(key).expect("location in db");

@@ -117,6 +117,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
+ "stop-words",
  "strsim 0.10.0",
  "strum",
  "strum_macros",
@@ -938,6 +939,15 @@ checksum = "0f82496b90c36d70af5fcd482edaa2e0bd16fade569de1330405fecbbdac736b"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "stop-words"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a95cb576d8c017e31f1a01317ed1e9cbeb56cadebc907ff6ecf07fcf48ccc3e"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

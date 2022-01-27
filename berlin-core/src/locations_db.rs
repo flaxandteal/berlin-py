@@ -6,9 +6,7 @@ use ustr::{Ustr, UstrMap, UstrSet};
 use crate::graph::ResultsGraph;
 use crate::location::Location;
 use crate::search::SearchTerm;
-use crate::{LOC_CODE_BOOST, SCORE_SOFT_MAX, SEARCH_INCLUSION_THRESHOLD, STOP_WORDS_PENALTY};
-
-const MAX_RESULTS_COUNT: usize = 1000;
+use crate::{SCORE_SOFT_MAX, SEARCH_INCLUSION_THRESHOLD};
 
 pub struct LocationsDb {
     pub stop_words_english: UstrSet,
@@ -70,66 +68,33 @@ impl LocationsDb {
             Some(loc) => loc.get_codes(),
         }
     }
-    pub fn boost_by_codes(
-        &self,
-        search_results: Vec<(Ustr, i64)>,
-        st: &SearchTerm,
-    ) -> Vec<(Ustr, i64)> {
-        let mut boosted: Vec<(Ustr, i64)> = search_results
-            .into_iter()
-            .map(|(key, score)| {
-                let loc = self.all.get(&key).expect("should be in the db");
-                let boost: i64 = st
-                    .codes
-                    .iter()
-                    .map(|code| match loc.code_match(*code) {
-                        true if st.str_in_stop_words(code) => LOC_CODE_BOOST - STOP_WORDS_PENALTY,
-                        true => LOC_CODE_BOOST,
-                        false => 0,
-                    })
-                    .sum();
-                (key, score + boost)
-            })
-            .collect();
-        boosted.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-        boosted
-    }
     pub fn search(&self, st: &SearchTerm, limit: usize) -> Vec<(Ustr, i64)> {
-        let locations_by_code = self.find_by_names(&st.codes);
-        let codes = locations_by_code
-            .iter()
-            .map(|l| self.get_codes(l))
-            .flatten()
-            .collect::<UstrSet>();
         let exact_locations = self
             .find_by_names(&st.exact_matches)
             .into_iter()
             .map(|l| (l, SCORE_SOFT_MAX))
             .collect::<Vec<_>>();
-        let exact_locations = self.boost_by_codes(exact_locations, st);
         info!("Exact locations: {}", exact_locations.len());
-        // if exact_locations.len() >= limit {
-        //     exact_locations.truncate(limit);
-        //     return exact_locations;
-        // }
-        let res = self.all.par_iter().filter_map(|(key, loc)| {
-            let score = loc.search(&st);
-            match score > SEARCH_INCLUSION_THRESHOLD {
-                true => Some((*key, score)),
-                false => None,
-            }
-        });
-        let mut res = res.collect::<Vec<_>>();
-        res.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-        res.truncate(MAX_RESULTS_COUNT);
-        let res = self.boost_by_codes(res, st);
-        let mut res: UstrMap<_> = res.into_iter().collect();
-        res.extend(exact_locations.into_iter().collect::<UstrMap<_>>());
-        // exact_locations.extend(res);
-        // exact_locations.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-        // exact_locations.truncate(MAX_RESULTS_COUNT);
-        let mut res: Vec<_> = res.into_iter().collect();
+        let mut res = if exact_locations.len() >= limit {
+            exact_locations
+        } else {
+            let mut r = self
+                .all
+                .par_iter()
+                .filter_map(|(key, loc)| {
+                    let score = loc.search(&st);
+                    match score > SEARCH_INCLUSION_THRESHOLD {
+                        true => Some((*key, score)),
+                        false => None,
+                    }
+                })
+                .collect::<Vec<_>>();
+            // r.truncate(10000);
+            r.extend(exact_locations);
+            r.into_iter().collect::<UstrMap<_>>().into_iter().collect()
+        };
         let res_graph = ResultsGraph::from_results(&res, &self);
+        res.extend(res_graph.scores.into_iter().collect::<Vec<_>>());
         res.sort_unstable_by(|a, b| b.1.cmp(&a.1));
         res.truncate(limit);
         res

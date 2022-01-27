@@ -99,6 +99,19 @@ impl Location {
             LocData::Airp(ap) => ap.code_match(code),
         }
     }
+    pub fn get_parents(&self) -> (Option<Ustr>, Option<Ustr>) {
+        match self.data {
+            LocData::St(_) => (None, None),
+            LocData::Subdv(sd) => (state_key(sd.supercode), None),
+            LocData::Locd(l) => (
+                state_key(l.supercode),
+                l.subdivision_code
+                    .map(|c| subdiv_key(l.supercode, c))
+                    .flatten(),
+            ),
+            LocData::Airp(a) => (state_key(a.country), None),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Clone, Copy)]

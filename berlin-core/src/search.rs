@@ -1,9 +1,9 @@
 use serde::Serialize;
-use strsim::jaro_winkler as similarity_algo;
-use ustr::{Ustr, UstrSet};
+use strsim::normalized_levenshtein as similarity_algo;
+use ustr::Ustr;
 
 use crate::locations_db::LocationsDb;
-use crate::{SCORE_SOFT_MAX, STOP_WORDS_PENALTY};
+use crate::{dedup, SCORE_SOFT_MAX, STOP_WORDS_PENALTY};
 
 #[derive(Debug, Default, Serialize)]
 pub struct NGrams {
@@ -32,9 +32,8 @@ impl SearchTerm {
         let stop_words = split_words
             .iter()
             .filter_map(|w| Ustr::from_existing(w).filter(|w| db.stop_words_english.contains(w)))
-            .collect::<UstrSet>()
-            .into_iter()
             .collect();
+        let stop_words = dedup(stop_words);
         for (i, w) in split_words.iter().enumerate() {
             if split_words.len() > i + 1 {
                 let doublet: String = [w, split_words[i + 1]].join(" ");
@@ -69,8 +68,8 @@ impl SearchTerm {
             raw,
             normalized,
             stop_words,
-            codes,
-            exact_matches,
+            codes: dedup(codes),
+            exact_matches: dedup(exact_matches),
             not_exact_matches,
         }
     }

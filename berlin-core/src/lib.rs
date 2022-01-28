@@ -11,7 +11,7 @@ pub mod locations_db;
 pub mod search;
 
 const SCORE_SOFT_MAX: i64 = 1000;
-const SEARCH_INCLUSION_THRESHOLD: i64 = 500;
+const SEARCH_INCLUSION_THRESHOLD: i64 = 300;
 const GRAPH_EDGE_THRESHOLD: i64 = 600;
 const STOP_WORDS_PENALTY: i64 = 10;
 

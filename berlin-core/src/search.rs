@@ -95,7 +95,7 @@ impl SearchTerm {
                 _ => max_match(subject, &self.not_exact_matches.triplets),
             },
         };
-        match self.stop_words.iter().any(|sw| sw == &subject) {
+        match self.str_in_stop_words(&subject) {
             true => score - STOP_WORDS_PENALTY,
             false => score,
         }

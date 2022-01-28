@@ -15,9 +15,8 @@ pub struct ResultsGraph {
 }
 
 impl ResultsGraph {
-    pub fn from_results(results: &[(Ustr, i64)], db: &LocationsDb) -> Self {
+    pub fn from_results(mut results: UstrMap<i64>, db: &LocationsDb) -> Self {
         let start = Instant::now();
-        let mut scores: UstrMap<i64> = results.iter().map(|(key, s)| (*key, *s)).collect();
         let mut graph: DiGraphMap<Ustr, _> = DiGraphMap::new();
         results.iter().for_each(|(key, score)| {
             let loc = db.all.get(key).expect("location in db");
@@ -26,7 +25,7 @@ impl ResultsGraph {
             // info!("{:?}:{:?} for {:?}", state_key, subdiv_key, loc.get_names());
             for key in [state_key, subdiv_key] {
                 if let Some(superkey) = key {
-                    if let Some(superkey_score) = scores.get(&superkey) {
+                    if let Some(superkey_score) = results.get(&superkey) {
                         if min(*superkey_score, *score) > GRAPH_EDGE_THRESHOLD {
                             let weight = (*superkey_score, *score);
                             graph.add_edge(superkey, loc.key, weight);
@@ -42,7 +41,7 @@ impl ResultsGraph {
         for (i, edge) in edges.iter().enumerate() {
             let loc = db.all.get(&edge.1).unwrap();
             let parent = db.all.get(&edge.0).unwrap();
-            scores.insert(loc.key, edge.2 .0 + edge.2 .1);
+            results.insert(loc.key, edge.2 .0 + edge.2 .1);
             // info!("locode: {:?}", loc);
             let loc_names = loc.get_names();
             let parent_names = parent.get_names();
@@ -59,7 +58,7 @@ impl ResultsGraph {
         }
         info!("Graph analysis in {:.3?}", start.elapsed());
         ResultsGraph {
-            scores,
+            scores: results,
             locs: graph,
         }
     }

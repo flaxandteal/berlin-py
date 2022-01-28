@@ -6,7 +6,7 @@ use ustr::{Ustr, UstrMap, UstrSet};
 use crate::graph::ResultsGraph;
 use crate::location::Location;
 use crate::search::SearchTerm;
-use crate::{SCORE_SOFT_MAX, SEARCH_INCLUSION_THRESHOLD};
+use crate::{SCORE_SOFT_MAX, SEARCH_INCLUSION_THRESHOLD, STOP_WORDS_PENALTY};
 
 pub struct LocationsDb {
     pub stop_words_english: UstrSet,
@@ -55,13 +55,6 @@ impl LocationsDb {
             Some(s) => s.clone(),
         }
     }
-    pub fn find_by_names(&self, names: &[Ustr]) -> Vec<Ustr> {
-        names
-            .iter()
-            .map(|c| self.find_by_name(c))
-            .flatten()
-            .collect::<Vec<_>>()
-    }
     pub fn get_codes(&self, key: &Ustr) -> Vec<Ustr> {
         match self.all.get(&key) {
             None => vec![],
@@ -69,32 +62,49 @@ impl LocationsDb {
         }
     }
     pub fn search(&self, st: &SearchTerm, limit: usize) -> Vec<(Ustr, i64)> {
-        let exact_locations = self
-            .find_by_names(&st.exact_matches)
-            .into_iter()
-            .map(|l| (l, SCORE_SOFT_MAX))
-            .collect::<Vec<_>>();
-        info!("Exact locations: {}", exact_locations.len());
-        let mut res = if exact_locations.len() >= limit {
-            exact_locations
-        } else {
-            let mut r = self
-                .all
-                .par_iter()
-                .filter_map(|(key, loc)| {
-                    let score = loc.search(&st);
-                    match score > SEARCH_INCLUSION_THRESHOLD {
-                        true => Some((*key, score)),
-                        false => None,
-                    }
-                })
-                .collect::<Vec<_>>();
-            // r.truncate(10000);
-            r.extend(exact_locations);
-            r.into_iter().collect::<UstrMap<_>>().into_iter().collect()
-        };
-        let res_graph = ResultsGraph::from_results(&res, &self);
-        res.extend(res_graph.scores.into_iter().collect::<Vec<_>>());
+        let exact_locs: UstrMap<i64> = st
+            .exact_matches
+            .iter()
+            .map(|ex_match| {
+                let found_keys = self.find_by_name(ex_match);
+                found_keys
+                    .iter()
+                    .map(|key| {
+                        let found_loc = self.all.get(key).unwrap();
+                        let score: i64 = found_loc
+                            .get_names()
+                            .iter()
+                            .map(|n| match st.exact_matches.contains(n) {
+                                _ if st.stop_words.contains(n) => {
+                                    SCORE_SOFT_MAX - STOP_WORDS_PENALTY
+                                }
+                                true => SCORE_SOFT_MAX,
+                                false => SCORE_SOFT_MAX - 1, // here we have exact match of one of the words in the name
+                            })
+                            .max()
+                            .unwrap_or(0);
+                        (*key, score)
+                    })
+                    .collect::<Vec<(Ustr, i64)>>()
+            })
+            .flatten()
+            .collect();
+        info!("Exact locations: {} {:?}", exact_locs.len(), exact_locs);
+        let mut res = self
+            .all
+            .par_iter()
+            .filter_map(|(key, loc)| {
+                let score = loc.search(&st);
+                match score > SEARCH_INCLUSION_THRESHOLD {
+                    true => Some((*key, score)),
+                    false => None,
+                }
+            })
+            .collect::<UstrMap<_>>();
+        info!("Strsim locations: {}", res.len());
+        res.extend(exact_locs);
+        let res_graph = ResultsGraph::from_results(res, &self);
+        let mut res = res_graph.scores.into_iter().collect::<Vec<_>>();
         res.sort_unstable_by(|a, b| b.1.cmp(&a.1));
         res.truncate(limit);
         res

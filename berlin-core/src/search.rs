@@ -2,7 +2,6 @@ use serde::Serialize;
 use strsim::normalized_levenshtein as similarity_algo;
 use ustr::Ustr;
 
-use crate::locations_db::LocationsDb;
 use crate::{dedup, SCORE_SOFT_MAX};
 
 const STOP_WORDS: [&str; 10] = [
@@ -27,7 +26,7 @@ pub struct SearchTerm {
 }
 
 impl SearchTerm {
-    pub fn from_raw_query(raw: String, db: &LocationsDb) -> Self {
+    pub fn from_raw_query(raw: String) -> Self {
         let normalized = crate::normalize(&raw);
         let mut codes: Vec<Ustr> = vec![];
         let mut exact_matches: Vec<Ustr> = Vec::default();

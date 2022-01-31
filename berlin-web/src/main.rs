@@ -83,7 +83,7 @@ async fn search_handler(
 ) -> Json<SearchResults> {
     let start_time = Instant::now();
     let limit = params.limit.unwrap_or(1);
-    let st = SearchTerm::from_raw_query(params.q, &state);
+    let st = SearchTerm::from_raw_query(params.q);
     let results = state
         .search(&st, limit)
         .into_iter()
@@ -102,7 +102,7 @@ async fn search_handler(
 fn cli_search_query(db: &LocationsDb) {
     let inp: String = promptly::prompt("Search Term").expect("Search term expected");
     let start = Instant::now();
-    let term = SearchTerm::from_raw_query(inp, &db);
+    let term = SearchTerm::from_raw_query(inp);
     info!("Parse query in {:.3?}", start.elapsed());
     warn!("TERM: {term:#?}");
     let start = Instant::now();
@@ -120,7 +120,7 @@ fn cli_search_query(db: &LocationsDb) {
 fn parse_json_files(data_dir: PathBuf) -> LocationsDb {
     let files = vec!["state.json", "subdivision.json", "locode.json", "iata.json"];
     let start = Instant::now();
-    let db = LocationsDb::new();
+    let db = LocationsDb::default();
     let db = RwLock::new(db);
     files.into_par_iter().for_each(|file| {
         let path = data_dir.join(file);

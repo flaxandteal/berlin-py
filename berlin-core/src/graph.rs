@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::cmp::{max, min};
 use std::time::Instant;
 
 use petgraph::graphmap::DiGraphMap;
@@ -22,7 +22,6 @@ impl ResultsGraph {
             let loc = db.all.get(key).expect("location in db");
             graph.add_node(loc.key);
             let (state_key, subdiv_key) = loc.get_parents();
-            // info!("{:?}:{:?} for {:?}", state_key, subdiv_key, loc.get_names());
             for key in [state_key, subdiv_key] {
                 if let Some(superkey) = key {
                     if let Some(superkey_score) = results.get(&superkey) {
@@ -34,28 +33,16 @@ impl ResultsGraph {
                 }
             }
         });
-        info!("nodes: {}", graph.node_count());
-        info!("edges: {}", graph.edge_count());
         let mut edges = graph.all_edges().collect::<Vec<_>>();
         edges.sort_unstable_by(|a, b| b.2.cmp(a.2));
-        for (i, edge) in edges.iter().enumerate() {
+        edges.into_iter().enumerate().for_each(|(i, edge)| {
             let loc = db.all.get(&edge.1).unwrap();
             let parent = db.all.get(&edge.0).unwrap();
             let parent_boost = parent.parent_boost(edge.2 .0);
-            results.insert(loc.key, parent_boost + edge.2 .1);
-            let loc_names = loc.get_names();
-            let parent_names = parent.get_names();
-            let functions = match loc.data {
-                LocData::Locd(lc) => lc.function_code.as_str(),
-                _ => "",
-            };
-            if i < 10 {
-                info!(
-                    "Edge: {:?} - {:?}-{:?} {}",
-                    edge, parent_names, loc_names, functions
-                );
-            }
-        }
+            let total_score = parent_boost + edge.2 .1;
+            let old = results.get(&loc.key).cloned().unwrap_or(0 as i64);
+            results.insert(loc.key, max(total_score, old));
+        });
         info!("Graph analysis in {:.3?}", start.elapsed());
         ResultsGraph {
             scores: results,

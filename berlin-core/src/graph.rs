@@ -41,8 +41,8 @@ impl ResultsGraph {
         for (i, edge) in edges.iter().enumerate() {
             let loc = db.all.get(&edge.1).unwrap();
             let parent = db.all.get(&edge.0).unwrap();
-            results.insert(loc.key, edge.2 .0 + edge.2 .1);
-            // info!("locode: {:?}", loc);
+            let parent_boost = parent.parent_boost(edge.2 .0);
+            results.insert(loc.key, parent_boost + edge.2 .1);
             let loc_names = loc.get_names();
             let parent_names = parent.get_names();
             let functions = match loc.data {

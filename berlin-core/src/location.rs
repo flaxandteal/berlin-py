@@ -3,10 +3,11 @@ use std::collections::HashMap;
 
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use ustr::Ustr;
 
-use crate::normalize;
 use crate::search::SearchTerm;
+use crate::{normalize, SCORE_SOFT_MAX, STATE_CODE_BOOST, SUBDIV_CODE_BOOST};
 
 #[derive(Debug, Deserialize)]
 pub struct AnyLocation {
@@ -75,7 +76,7 @@ impl Location {
             LocData::Airp(d) => d.search(term),
         }
     }
-    pub fn get_names(&self) -> Vec<Ustr> {
+    pub fn get_names(&self) -> SmallVec<[Ustr; 1]> {
         match &self.data {
             LocData::St(st) => st.get_names(),
             LocData::Subdv(sd) => sd.get_names(),
@@ -83,20 +84,12 @@ impl Location {
             LocData::Airp(ap) => ap.get_names(),
         }
     }
-    pub fn get_codes(&self) -> Vec<Ustr> {
+    pub fn get_codes(&self) -> SmallVec<[Ustr; 1]> {
         match &self.data {
             LocData::St(st) => st.get_codes(),
             LocData::Subdv(sd) => sd.get_codes(),
             LocData::Locd(lc) => lc.get_codes(),
             LocData::Airp(ap) => ap.get_codes(),
-        }
-    }
-    pub fn code_match(&self, code: Ustr) -> bool {
-        match &self.data {
-            LocData::St(st) => st.code_match(code),
-            LocData::Subdv(sd) => sd.code_match(code),
-            LocData::Locd(locd) => locd.code_match(code),
-            LocData::Airp(ap) => ap.code_match(code),
         }
     }
     pub fn get_parents(&self) -> (Option<Ustr>, Option<Ustr>) {
@@ -110,6 +103,14 @@ impl Location {
                     .flatten(),
             ),
             LocData::Airp(a) => (state_key(a.country), None),
+        }
+    }
+    pub fn parent_boost(&self, score: i64) -> i64 {
+        match self.data {
+            LocData::St(_) => score / 2,
+            LocData::Subdv(_) => score / 3,
+            LocData::Locd(_) => score / 4,
+            LocData::Airp(_) => 0,
         }
     }
 }
@@ -151,23 +152,26 @@ pub struct State {
 }
 
 impl State {
-    fn get_names(&self) -> Vec<Ustr> {
-        vec![self.name, self.short, self.alpha2, self.alpha3]
+    fn get_names(&self) -> SmallVec<[Ustr; 1]> {
+        match self.short.len() > 3 {
+            true if self.short != self.name => smallvec![self.name, self.short],
+            _ => smallvec![self.name],
+        }
     }
-    fn get_codes(&self) -> Vec<Ustr> {
-        vec![self.alpha2, self.alpha3]
-    }
-    fn code_match(&self, code: Ustr) -> bool {
-        [self.short, self.alpha2, self.alpha3]
-            .iter()
-            .any(|f| f == &code)
+    fn get_codes(&self) -> SmallVec<[Ustr; 1]> {
+        let mut codes = smallvec![self.alpha2, self.alpha3];
+        if self.short.len() < 4 {
+            codes.push(self.short);
+        }
+        codes
     }
     fn search(&self, t: &SearchTerm) -> i64 {
-        self.get_names()
-            .iter()
-            .map(|n| t.match_str(n))
-            .max()
-            .unwrap_or(0)
+        let codes = self.get_codes();
+        if codes.iter().any(|c| t.codes.contains(c)) {
+            return SCORE_SOFT_MAX + STATE_CODE_BOOST;
+        }
+        let mut names = self.get_names();
+        names.iter().map(|n| t.match_str(n)).max().unwrap_or(0)
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -202,17 +206,17 @@ impl Subdivision {
             subcode: self.subcode,
         }
     }
-    fn get_names(&self) -> Vec<Ustr> {
-        vec![self.name, self.subcode]
+    fn get_names(&self) -> SmallVec<[Ustr; 1]> {
+        smallvec![self.name]
     }
-    fn get_codes(&self) -> Vec<Ustr> {
-        vec![self.subcode]
-    }
-    fn code_match(&self, code: Ustr) -> bool {
-        [self.supercode, self.subcode].iter().any(|f| f == &code)
+    fn get_codes(&self) -> SmallVec<[Ustr; 1]> {
+        smallvec![self.subcode]
     }
     fn search(&self, t: &SearchTerm) -> i64 {
-        max(t.match_str(&self.name), t.match_str(&self.subcode))
+        if t.codes.contains(&self.subcode) {
+            return SCORE_SOFT_MAX + SUBDIV_CODE_BOOST;
+        }
+        t.match_str(&self.name)
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -236,23 +240,14 @@ pub struct Locode {
 }
 
 impl Locode {
-    fn get_names(&self) -> Vec<Ustr> {
-        vec![self.name]
+    fn get_names(&self) -> SmallVec<[Ustr; 1]> {
+        smallvec![self.name]
     }
-    fn get_codes(&self) -> Vec<Ustr> {
-        vec![]
-    }
-    fn code_match(&self, code: Ustr) -> bool {
-        let mut codes = vec![];
-        if let Some(sd) = self.subdivision_code {
-            codes.push(sd);
-        }
-        codes.push(self.subcode);
-        codes.push(self.supercode);
-        codes.iter().any(|f| f == &code)
+    fn get_codes(&self) -> SmallVec<[Ustr; 1]> {
+        smallvec![self.subcode]
     }
     fn search(&self, t: &SearchTerm) -> i64 {
-        t.match_str(&self.name)
+        max(t.match_str(&self.name), t.match_str(&self.subcode))
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let r = serde_json::from_value::<HashMap<String, String>>(r)?;
@@ -297,17 +292,14 @@ pub struct Airport {
 }
 
 impl Airport {
-    fn get_names(&self) -> Vec<Ustr> {
-        vec![self.name]
+    fn get_names(&self) -> SmallVec<[Ustr; 1]> {
+        smallvec![self.name]
     }
-    fn get_codes(&self) -> Vec<Ustr> {
-        vec![]
-    }
-    fn code_match(&self, code: Ustr) -> bool {
-        self.country == code
+    fn get_codes(&self) -> SmallVec<[Ustr; 1]> {
+        smallvec![self.iata]
     }
     fn search(&self, t: &SearchTerm) -> i64 {
-        t.match_str(&self.name)
+        max(t.match_str(&self.name), t.match_str(&self.iata))
     }
     fn from_raw(r: serde_json::Value) -> serde_json::Result<Self> {
         let raw = serde_json::from_value::<AirportRaw>(r)?;

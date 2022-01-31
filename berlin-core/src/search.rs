@@ -3,7 +3,11 @@ use strsim::normalized_levenshtein as similarity_algo;
 use ustr::Ustr;
 
 use crate::locations_db::LocationsDb;
-use crate::{dedup, SCORE_SOFT_MAX, STOP_WORDS_PENALTY};
+use crate::{dedup, SCORE_SOFT_MAX};
+
+const STOP_WORDS: [&str; 10] = [
+    "at", "to", "in", "on", "of", "for", "by", "and", "was", "did",
+];
 
 #[derive(Debug, Default, Serialize)]
 pub struct NGrams {
@@ -31,7 +35,7 @@ impl SearchTerm {
         let split_words = normalized.split(" ").collect::<Vec<_>>();
         let stop_words = split_words
             .iter()
-            .filter_map(|w| Ustr::from_existing(w).filter(|w| db.stop_words_english.contains(w)))
+            .filter_map(|w| Ustr::from_existing(w).filter(|w| STOP_WORDS.contains(&w.as_str())))
             .collect();
         let stop_words = dedup(stop_words);
         for (i, w) in split_words.iter().enumerate() {
@@ -52,7 +56,8 @@ impl SearchTerm {
             match Ustr::from_existing(w) {
                 None => not_exact_matches.words.push(w.to_string()),
                 Some(known_ustr) => match w.len() {
-                    0 | 1 => {} // ignore
+                    0 | 1 => {}                                 // ignore
+                    _ if stop_words.contains(&known_ustr) => {} // ignore stop words
                     2 | 3 => {
                         codes.push(known_ustr);
                         exact_matches.push(known_ustr)
@@ -74,34 +79,39 @@ impl SearchTerm {
         }
     }
     pub fn match_str(&self, subject: &str) -> i64 {
-        let words_count = subject.split(" ").count();
-        let score = match self.exact_matches.iter().any(|m| m == &subject) {
-            true => SCORE_SOFT_MAX,
-            false => match words_count {
-                0 => 0,
-                1 => self
-                    .not_exact_matches
-                    .words
-                    .iter()
-                    .map(
-                        |w| match w.len() > subject.len() - 2 && w.len() < subject.len() + 2 {
-                            true => (similarity_algo(subject, &w) * SCORE_SOFT_MAX as f64) as i64,
-                            false => 0,
-                        },
-                    )
-                    .max()
-                    .unwrap_or(0),
-                2 => max_match(subject, &self.not_exact_matches.doublets),
-                _ => max_match(subject, &self.not_exact_matches.triplets),
-            },
-        };
-        match self.str_in_stop_words(&subject) {
-            true => score - STOP_WORDS_PENALTY,
-            false => score,
+        let exact = self
+            .exact_matches
+            .iter()
+            .filter_map(|m| match m == &subject {
+                true => Some(SCORE_SOFT_MAX + m.len() as i64),
+                false => None,
+            })
+            .max();
+        match exact {
+            Some(s) => s,
+            None => {
+                let words_count = subject.split(" ").count();
+                match words_count {
+                    0 => 0,
+                    1 => self
+                        .not_exact_matches
+                        .words
+                        .iter()
+                        .map(
+                            |w| match w.len() > subject.len() - 2 && w.len() < subject.len() + 2 {
+                                true => {
+                                    (similarity_algo(subject, &w) * SCORE_SOFT_MAX as f64) as i64
+                                }
+                                false => 0,
+                            },
+                        )
+                        .max()
+                        .unwrap_or(0),
+                    2 => max_match(subject, &self.not_exact_matches.doublets),
+                    _ => max_match(subject, &self.not_exact_matches.triplets),
+                }
+            }
         }
-    }
-    pub fn str_in_stop_words(&self, s: &str) -> bool {
-        self.stop_words.iter().any(|sw| sw == &s)
     }
 }
 

@@ -91,6 +91,11 @@ impl Location {
         Ok(loc)
     }
     pub fn search(&self, t: &SearchTerm) -> i64 {
+        if let Some(sf) = &t.state_filter {
+            if self.get_state() != *sf {
+                return 0;
+            }
+        }
         let words_score = self
             .words
             .iter()
@@ -153,6 +158,14 @@ impl Location {
             LocData::Airp(_) => 0,
         }
     }
+    pub fn get_state(&self) -> Ustr {
+        match self.data {
+            LocData::St(d) => d.alpha2,
+            LocData::Subdv(d) => d.supercode,
+            LocData::Locd(d) => d.supercode,
+            LocData::Airp(d) => d.country,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Clone, Copy)]
@@ -186,7 +199,7 @@ impl LocData {
 pub struct State {
     name: Ustr,
     short: Ustr,
-    pub(crate) alpha2: Ustr,
+    alpha2: Ustr,
     alpha3: Ustr,
     continent: Ustr,
 }

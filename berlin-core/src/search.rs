@@ -23,10 +23,11 @@ pub struct SearchTerm {
     pub codes: Vec<Ustr>,
     pub exact_matches: Vec<Ustr>,
     pub not_exact_matches: NGrams,
+    pub state_filter: Option<Ustr>,
 }
 
 impl SearchTerm {
-    pub fn from_raw_query(raw: String) -> Self {
+    pub fn from_raw_query(raw: String, state_filter: Option<String>) -> Self {
         let normalized = crate::normalize(&raw);
         let mut codes: Vec<Ustr> = vec![];
         let mut exact_matches: Vec<Ustr> = Vec::default();
@@ -75,6 +76,7 @@ impl SearchTerm {
             codes: dedup(codes),
             exact_matches: dedup(exact_matches),
             not_exact_matches,
+            state_filter: state_filter.map(|s| Ustr::from_existing(&s)).flatten(),
         }
     }
     pub fn match_str(&self, subject: &str) -> i64 {

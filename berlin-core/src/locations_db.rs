@@ -28,11 +28,9 @@ impl LocationsDb {
                 }
             })
             .collect::<UstrMap<_>>();
-        info!("Found locations: {}", res.len());
         let res_graph = ResultsGraph::from_results(res, &self);
         let mut res = res_graph.scores.into_iter().collect::<Vec<_>>();
         res.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-        info!("RES: {:?}", res[..10].to_vec());
         res.truncate(limit);
         res
     }

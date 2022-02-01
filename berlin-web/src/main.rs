@@ -62,6 +62,7 @@ async fn main() {
 struct SearchParams {
     q: String,
     limit: Option<usize>,
+    state: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -83,7 +84,7 @@ async fn search_handler(
 ) -> Json<SearchResults> {
     let start_time = Instant::now();
     let limit = params.limit.unwrap_or(1);
-    let st = SearchTerm::from_raw_query(params.q);
+    let st = SearchTerm::from_raw_query(params.q, params.state);
     let results = state
         .search(&st, limit)
         .into_iter()
@@ -102,7 +103,7 @@ async fn search_handler(
 fn cli_search_query(db: &LocationsDb) {
     let inp: String = promptly::prompt("Search Term").expect("Search term expected");
     let start = Instant::now();
-    let term = SearchTerm::from_raw_query(inp);
+    let term = SearchTerm::from_raw_query(inp, None);
     info!("Parse query in {:.3?}", start.elapsed());
     warn!("TERM: {term:#?}");
     let start = Instant::now();

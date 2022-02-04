@@ -110,7 +110,6 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "deunicode",
- "fuzzy-matcher",
  "petgraph",
  "rayon",
  "regex",
@@ -120,7 +119,6 @@ dependencies = [
  "strsim 0.10.0",
  "strum",
  "strum_macros",
- "sublime_fuzzy",
  "tracing",
  "ustr",
 ]
@@ -353,15 +351,6 @@ dependencies = [
  "futures-task",
  "pin-project-lite",
  "pin-utils",
-]
-
-[[package]]
-name = "fuzzy-matcher"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54614a3312934d066701a80f20f15fa3b56d67ac7722b39eea5b4c9dd1d66c94"
-dependencies = [
- "thread_local",
 ]
 
 [[package]]
@@ -997,12 +986,6 @@ dependencies = [
  "rustversion",
  "syn",
 ]
-
-[[package]]
-name = "sublime_fuzzy"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa7986063f7c0ab374407e586d7048a3d5aac94f103f751088bf398e07cd5400"
 
 [[package]]
 name = "syn"

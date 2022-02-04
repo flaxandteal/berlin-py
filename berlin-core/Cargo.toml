@@ -22,7 +22,5 @@ tracing = { version = "0.1.29", features = ["log"] }
 deunicode = "1.3.1"
 
 strsim = "0.10.0"
-fuzzy-matcher = "0.3.7"
-sublime_fuzzy = "0.7.0"
 
 petgraph = "0.6.0"

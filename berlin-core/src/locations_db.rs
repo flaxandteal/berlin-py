@@ -1,5 +1,4 @@
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use tracing::info;
 use ustr::{Ustr, UstrMap};
 
 use crate::graph::ResultsGraph;

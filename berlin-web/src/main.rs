@@ -47,6 +47,7 @@ async fn main() {
         let db = Arc::new(db);
         let app = Router::new()
             .route("/search", get(search_handler))
+            .route("/health", get(health_check_handler))
             .layer(AddExtensionLayer::new(db))
             .layer(TraceLayer::new_for_http());
         let addr = "0.0.0.0:3000";
@@ -56,6 +57,10 @@ async fn main() {
             .await
             .unwrap();
     }
+}
+
+async fn health_check_handler() -> &'static str {
+    "OK"
 }
 
 #[derive(Debug, Deserialize)]

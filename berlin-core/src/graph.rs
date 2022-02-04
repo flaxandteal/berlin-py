@@ -5,13 +5,11 @@ use petgraph::graphmap::DiGraphMap;
 use tracing::info;
 use ustr::{Ustr, UstrMap};
 
-use crate::location::LocData;
 use crate::locations_db::LocationsDb;
 use crate::GRAPH_EDGE_THRESHOLD;
 
 pub struct ResultsGraph {
     pub(crate) scores: UstrMap<i64>,
-    locs: DiGraphMap<Ustr, (i64, i64)>,
 }
 
 impl ResultsGraph {
@@ -35,7 +33,7 @@ impl ResultsGraph {
         });
         let mut edges = graph.all_edges().collect::<Vec<_>>();
         edges.sort_unstable_by(|a, b| b.2.cmp(a.2));
-        edges.into_iter().enumerate().for_each(|(i, edge)| {
+        edges.into_iter().enumerate().for_each(|(_i, edge)| {
             let loc = db.all.get(&edge.1).unwrap();
             let parent = db.all.get(&edge.0).unwrap();
             let parent_boost = parent.parent_boost(edge.2 .0);
@@ -44,9 +42,6 @@ impl ResultsGraph {
             results.insert(loc.key, max(total_score, old));
         });
         info!("Graph analysis in {:.3?}", start.elapsed());
-        ResultsGraph {
-            scores: results,
-            locs: graph,
-        }
+        ResultsGraph { scores: results }
     }
 }

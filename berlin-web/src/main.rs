@@ -12,8 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use structopt::StructOpt;
 use tower_http::trace::TraceLayer;
-use tracing::log::warn;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use berlin_core::location::{AnyLocation, Location};
 use berlin_core::locations_db::LocationsDb;

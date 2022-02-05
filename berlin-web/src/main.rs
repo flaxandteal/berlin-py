@@ -5,10 +5,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use axum::extract::{Extension, Query};
 use axum::routing::get;
-use axum::{AddExtensionLayer, Json, Router};
-use serde::{Deserialize, Serialize};
+use axum::{AddExtensionLayer, Router};
+use schemars::schema_for;
 use serde_json::Value;
 use structopt::StructOpt;
 use tower_http::trace::TraceLayer;
@@ -19,7 +18,8 @@ use berlin_core::locations_db::LocationsDb;
 use berlin_core::rayon::iter::IntoParallelIterator;
 use berlin_core::rayon::prelude::*;
 use berlin_core::search::SearchTerm;
-use berlin_web::init_logging;
+use berlin_web::search_handler::SearchTermJson;
+use berlin_web::{init_logging, search_handler};
 
 #[derive(StructOpt)]
 struct CliArgs {
@@ -45,11 +45,12 @@ async fn main() {
     } else {
         let db = Arc::new(db);
         let app = Router::new()
-            .route("/search", get(search_handler))
+            .route("/search", get(search_handler::search_handler))
+            .route("/search-schema", get(search_schema_handler))
             .route("/health", get(health_check_handler))
             .layer(AddExtensionLayer::new(db))
             .layer(TraceLayer::new_for_http());
-        let addr = "0.0.0.0:3000";
+        let addr = "0.0.0.0:3001";
         info!("Will listen on {addr}");
         axum::Server::bind(&addr.parse().unwrap())
             .serve(app.into_make_service())
@@ -62,46 +63,9 @@ async fn health_check_handler() -> &'static str {
     "OK"
 }
 
-#[derive(Debug, Deserialize)]
-struct SearchParams {
-    q: String,
-    limit: Option<usize>,
-    state: Option<String>,
-}
-
-#[derive(Serialize)]
-struct SearchResults {
-    time: String,
-    query: SearchTerm,
-    results: Vec<SearchResult>,
-}
-
-#[derive(Serialize)]
-struct SearchResult {
-    loc: Location,
-    score: i64,
-}
-
-async fn search_handler(
-    Query(params): Query<SearchParams>,
-    Extension(state): Extension<Arc<LocationsDb>>,
-) -> Json<SearchResults> {
-    let start_time = Instant::now();
-    let limit = params.limit.unwrap_or(1);
-    let st = SearchTerm::from_raw_query(params.q, params.state);
-    let results = state
-        .search(&st, limit)
-        .into_iter()
-        .map(|(key, score)| {
-            let loc: Location = state.all.get(&key).cloned().expect("loc should be in db");
-            SearchResult { loc, score }
-        })
-        .collect();
-    Json(SearchResults {
-        time: format!("{:.3?}", start_time.elapsed()),
-        query: st,
-        results,
-    })
+async fn search_schema_handler() -> String {
+    let schema = schema_for!(SearchTermJson);
+    serde_json::to_string_pretty(&schema).expect("json schema")
 }
 
 fn cli_search_query(db: &LocationsDb) {
@@ -145,7 +109,7 @@ fn parse_json_files(data_dir: PathBuf) -> LocationsDb {
                         match loc {
                             Ok(loc) => Some(loc),
                             Err(err) => {
-                                error!("Error for: {id} {err:?}");
+                                error!("Error for: {id} {:?}", err);
                                 None
                             }
                         }

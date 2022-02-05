@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::Serialize;
 use strsim::normalized_levenshtein as similarity_algo;
 use ustr::Ustr;
@@ -8,7 +9,7 @@ const STOP_WORDS: [&str; 10] = [
     "at", "to", "in", "on", "of", "for", "by", "and", "was", "did",
 ];
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Serialize, JsonSchema)]
 pub struct NGrams {
     pub(crate) words: Vec<String>,
     pub(crate) doublets: Vec<String>,

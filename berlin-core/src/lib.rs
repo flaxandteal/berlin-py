@@ -3,6 +3,8 @@ use std::hash::Hash;
 
 pub use deunicode;
 pub use rayon;
+pub use smallvec;
+pub use ustr;
 
 mod graph;
 pub mod location;

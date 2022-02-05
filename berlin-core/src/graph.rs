@@ -1,8 +1,6 @@
 use std::cmp::{max, min};
-use std::time::Instant;
 
 use petgraph::graphmap::DiGraphMap;
-use tracing::info;
 use ustr::{Ustr, UstrMap};
 
 use crate::locations_db::LocationsDb;
@@ -14,7 +12,7 @@ pub struct ResultsGraph {
 
 impl ResultsGraph {
     pub fn from_results(mut results: UstrMap<i64>, db: &LocationsDb) -> Self {
-        let start = Instant::now();
+        // let start = Instant::now();
         let mut graph: DiGraphMap<Ustr, _> = DiGraphMap::new();
         results.iter().for_each(|(key, score)| {
             let loc = db.all.get(key).expect("location in db");
@@ -41,7 +39,7 @@ impl ResultsGraph {
             let old = results.get(&loc.key).cloned().unwrap_or(0 as i64);
             results.insert(loc.key, max(total_score, old));
         });
-        info!("Graph analysis in {:.3?}", start.elapsed());
+        // info!("Graph analysis in {:.3?}", start.elapsed());
         ResultsGraph { scores: results }
     }
 }

@@ -7,7 +7,6 @@ use std::time::Instant;
 
 use axum::routing::get;
 use axum::{AddExtensionLayer, Router};
-use schemars::schema_for;
 use serde_json::Value;
 use structopt::StructOpt;
 use tower_http::trace::TraceLayer;
@@ -18,7 +17,6 @@ use berlin_core::locations_db::LocationsDb;
 use berlin_core::rayon::iter::IntoParallelIterator;
 use berlin_core::rayon::prelude::*;
 use berlin_core::search::SearchTerm;
-use berlin_web::search_handler::SearchTermJson;
 use berlin_web::{init_logging, search_handler};
 
 #[derive(StructOpt)]
@@ -46,7 +44,7 @@ async fn main() {
         let db = Arc::new(db);
         let app = Router::new()
             .route("/search", get(search_handler::search_handler))
-            .route("/search-schema", get(search_schema_handler))
+            .route("/search-schema", get(search_handler::search_schema_handler))
             .route("/health", get(health_check_handler))
             .layer(AddExtensionLayer::new(db))
             .layer(TraceLayer::new_for_http());
@@ -61,11 +59,6 @@ async fn main() {
 
 async fn health_check_handler() -> &'static str {
     "OK"
-}
-
-async fn search_schema_handler() -> String {
-    let schema = schema_for!(SearchTermJson);
-    serde_json::to_string_pretty(&schema).expect("json schema")
 }
 
 fn cli_search_query(db: &LocationsDb) {

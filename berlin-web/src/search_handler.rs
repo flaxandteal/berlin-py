@@ -1,13 +1,15 @@
+use std::sync::Arc;
+use std::time::Instant;
+
 use axum::extract::{Extension, Query};
 use axum::Json;
+use schemars::{schema_for, JsonSchema};
+use serde::{Deserialize, Serialize};
+
 use berlin_core::location::Location;
 use berlin_core::locations_db::LocationsDb;
 use berlin_core::search::{NGrams, SearchTerm};
 use berlin_core::smallvec::SmallVec;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::time::Instant;
 
 #[derive(Debug, Deserialize)]
 pub struct SearchParams {
@@ -96,4 +98,9 @@ pub async fn search_handler(
         query: SearchTermJson::from_search_term(st),
         results,
     })
+}
+
+pub async fn search_schema_handler() -> String {
+    let schema = schema_for!(SearchResults);
+    serde_json::to_string(&schema).expect("json schema")
 }

@@ -1,5 +1,5 @@
 [workspace]
-members = ["berlin-core", "berlin-web"]
+members = ["berlin-core", "berlin-web", "berlin-py"]
 
 [profile.dev]
 split-debuginfo = "unpacked"

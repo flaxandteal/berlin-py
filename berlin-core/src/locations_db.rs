@@ -1,12 +1,19 @@
 use std::time::Instant;
 
 use fst::{Automaton, IntoStreamer, Streamer};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use tracing::info;
+use rayon::iter::{
+    IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator,
+};
+use serde_json::Value;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::PathBuf;
+use std::sync::RwLock;
+use tracing::{error, info};
 use ustr::{Ustr, UstrMap, UstrSet};
 
 use crate::graph::ResultsGraph;
-use crate::location::Location;
+use crate::location::{AnyLocation, Location};
 use crate::search::SearchTerm;
 use crate::SEARCH_INCLUSION_THRESHOLD;
 
@@ -97,4 +104,51 @@ impl LocationsDb {
         res.truncate(limit);
         res
     }
+}
+
+pub fn parse_json_files(data_dir: PathBuf) -> LocationsDb {
+    let files = vec!["state.json", "subdivision.json", "locode.json", "iata.json"];
+    let start = Instant::now();
+    let db = LocationsDb::default();
+    let db = RwLock::new(db);
+    files.into_par_iter().for_each(|file| {
+        let path = data_dir.join(file);
+        info!("Path {path:?}");
+        let fo = File::open(path).expect("cannot open json file");
+        let reader = BufReader::new(fo);
+        let json: serde_json::Value = serde_json::from_reader(reader).expect("cannot decode json");
+        info!("Decode json file {file}: {:.2?}", start.elapsed());
+        match json {
+            Value::Object(obj) => {
+                let iter = obj.into_iter().par_bridge();
+                let codes = iter
+                    .filter_map(|(id, val)| {
+                        let raw_any = serde_json::from_value::<AnyLocation>(val)
+                            .expect("Cannot decode location code");
+                        let loc = Location::from_raw(raw_any);
+                        match loc {
+                            Ok(loc) => Some(loc),
+                            Err(err) => {
+                                error!("Error for: {id} {:?}", err);
+                                None
+                            }
+                        }
+                    })
+                    .for_each(|l| {
+                        let mut db = db.write().expect("cannot aquire lock");
+                        db.insert(l);
+                    });
+                info!("{file} decoded to native structs: {:.2?}", start.elapsed());
+                codes
+            }
+            other => panic!("Expected a JSON object: {other:?}"),
+        }
+    });
+    let db = db.into_inner().expect("rw lock extract").mk_fst();
+    info!(
+        "parsed {} locations in: {:.2?}",
+        db.all.len(),
+        start.elapsed()
+    );
+    db
 }

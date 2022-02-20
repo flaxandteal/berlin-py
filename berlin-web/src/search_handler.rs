@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use berlin_core::location::Location;
 use berlin_core::locations_db::LocationsDb;
-use berlin_core::search::{NGrams, SearchTerm};
+use berlin_core::search::SearchTerm;
 use berlin_core::smallvec::SmallVec;
 
 #[derive(Debug, Deserialize)]
@@ -38,7 +38,7 @@ pub struct SearchTermJson {
     pub stop_words: Vec<&'static str>,
     pub codes: Vec<&'static str>,
     pub exact_matches: Vec<&'static str>,
-    pub not_exact_matches: NGrams,
+    pub not_exact_matches: Vec<String>,
     pub state_filter: Option<&'static str>,
 }
 
@@ -94,7 +94,7 @@ pub async fn search_handler(
         })
         .collect();
     Json(SearchResults {
-        time: format!("{:.3?}", start_time.elapsed()),
+        time: format!("{:.2?}", start_time.elapsed()),
         query: SearchTermJson::from_search_term(st),
         results,
     })

@@ -131,7 +131,6 @@ name = "berlin-py"
 version = "0.1.0"
 dependencies = [
  "berlin-core",
- "berlin-web",
  "pyo3",
  "serde",
  "serde_json",

@@ -117,7 +117,7 @@ fn parse_json_files(data_dir: PathBuf) -> LocationsDb {
             other => panic!("Expected a JSON object: {other:?}"),
         }
     });
-    let db = db.into_inner().expect("rw lock extract");
+    let db = db.into_inner().expect("rw lock extract").mk_fst();
     info!(
         "parsed {} locations in: {:.2?}",
         db.all.len(),

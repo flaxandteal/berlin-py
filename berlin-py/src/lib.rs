@@ -51,9 +51,13 @@ impl LocationProxy {
             "key" => self._loc.key.to_string(),
             "encoding" => self._loc.encoding.to_string(),
             "id" => self._loc.id.to_string(),
-            "words" => self._loc.words.iter().map(|word| {
-                word.to_string()
-            }).collect(),
+            "words" => self
+                ._loc
+                .words
+                .iter()
+                .map(|word| word.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
             _ => {
                 let err = PyTypeError::new_err("AttributeError");
                 return Err(err)

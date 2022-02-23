@@ -37,8 +37,11 @@ async fn main() {
     } else {
         let db = Arc::new(db);
         let app = Router::new()
-            .route("/search", get(search_handler::search_handler))
-            .route("/search-schema", get(search_handler::search_schema_handler))
+            .route("/berlin/search", get(search_handler::search_handler))
+            .route(
+                "/berlin/search-schema",
+                get(search_handler::search_schema_handler),
+            )
             .route("/health", get(health_check_handler))
             .layer(AddExtensionLayer::new(db))
             .layer(TraceLayer::new_for_http());

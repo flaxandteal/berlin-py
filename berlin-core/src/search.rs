@@ -5,8 +5,8 @@ use ustr::Ustr;
 
 use crate::{dedup, SCORE_SOFT_MAX};
 
-const STOP_WORDS: [&str; 10] = [
-    "at", "to", "in", "on", "of", "for", "by", "and", "was", "did",
+const STOP_WORDS: [&str; 11] = [
+    "at", "to", "in", "on", "of", "for", "by", "and", "was", "did", "the",
 ];
 
 #[derive(Debug, Serialize)]

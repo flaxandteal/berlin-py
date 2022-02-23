@@ -28,7 +28,7 @@ async fn main() {
 
     let current_dir = env::current_dir().expect("get current directory");
     let data_dir = current_dir.join("data");
-    let db = locations_db::parse_json_files(data_dir);
+    let db = locations_db::parse_data_files(data_dir);
 
     if args.interactive {
         loop {

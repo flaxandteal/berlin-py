@@ -1,19 +1,20 @@
+use std::fs::File;
+use std::io::BufReader;
+use std::path::PathBuf;
+use std::sync::RwLock;
 use std::time::Instant;
 
+use csv::ReaderBuilder;
 use fst::{Automaton, IntoStreamer, Streamer};
 use rayon::iter::{
     IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator,
 };
 use serde_json::Value;
-use std::fs::File;
-use std::io::BufReader;
-use std::path::PathBuf;
-use std::sync::RwLock;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use ustr::{Ustr, UstrMap, UstrSet};
 
 use crate::graph::ResultsGraph;
-use crate::location::{AnyLocation, Location};
+use crate::location::{AnyLocation, CsvLocode, LocData, Location};
 use crate::search::SearchTerm;
 use crate::SEARCH_INCLUSION_THRESHOLD;
 
@@ -106,7 +107,7 @@ impl LocationsDb {
     }
 }
 
-pub fn parse_json_files(data_dir: PathBuf) -> LocationsDb {
+pub fn parse_data_files(data_dir: PathBuf) -> LocationsDb {
     let files = vec!["state.json", "subdivision.json", "locode.json", "iata.json"];
     let start = Instant::now();
     let db = LocationsDb::default();
@@ -144,11 +145,30 @@ pub fn parse_json_files(data_dir: PathBuf) -> LocationsDb {
             other => panic!("Expected a JSON object: {other:?}"),
         }
     });
-    let db = db.into_inner().expect("rw lock extract").mk_fst();
-    info!(
-        "parsed {} locations in: {:.2?}",
-        db.all.len(),
-        start.elapsed()
-    );
+    let mut db = db.into_inner().expect("rw lock extract").mk_fst();
+    let csv_file = data_dir.join("code-list_csv.csv");
+    let csv_file_open = File::open(csv_file).expect("Read CSV File");
+    let mut csv_reader = ReaderBuilder::new().from_reader(csv_file_open);
+    let iter = csv_reader.deserialize::<CsvLocode>();
+    let mut nerrs = 1;
+    for rec in iter {
+        let csv_loc = rec.expect("CSV Locode decode");
+        let key = &csv_loc.key();
+        match db.all.get_mut(key) {
+            None => {
+                warn!("#{} LOCODE not found in db: {} {:?}", nerrs, key, csv_loc);
+                nerrs += 1;
+            }
+            Some(loc) => {
+                let coord = csv_loc.parse_coordinates();
+                match loc.data {
+                    LocData::Locd(mut d) => d.coordinages = coord,
+                    _ => panic!("should not happen"),
+                }
+            }
+        }
+    }
+    let count = db.all.len();
+    info!("parsed {} locations in: {:.2?}", count, start.elapsed());
     db
 }

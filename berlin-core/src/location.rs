@@ -4,11 +4,14 @@ use std::collections::HashMap;
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use tracing::error;
 use ustr::{Ustr, UstrSet};
 
+use crate::coordinates::Coordinates;
 use crate::search::SearchTerm;
 use crate::{
-    normalize, SCORE_SOFT_MAX, SINGLE_WORD_MATCH_PENALTY, STATE_CODE_BOOST, SUBDIV_CODE_BOOST,
+    coordinates, normalize, SCORE_SOFT_MAX, SINGLE_WORD_MATCH_PENALTY, STATE_CODE_BOOST,
+    SUBDIV_CODE_BOOST,
 };
 
 #[derive(Debug, Deserialize)]
@@ -38,7 +41,7 @@ pub fn subdiv_key(state_code: Ustr, subdiv_code: Ustr) -> Option<Ustr> {
     Ustr::from_existing(str.as_str())
 }
 
-const LOCODE_ENCODING: &str = "UN-LOCODE";
+pub const LOCODE_ENCODING: &str = "UN-LOCODE";
 const IATA_ENCODING: &str = "IATA";
 
 #[derive(Debug, Serialize, Clone)]
@@ -276,6 +279,7 @@ pub struct Locode {
     subdivision_name: Option<Ustr>,
     pub(crate) subdivision_code: Option<Ustr>,
     pub(crate) function_code: Ustr,
+    pub(crate) coordinages: Option<Coordinates>,
 }
 
 impl Locode {
@@ -296,6 +300,7 @@ impl Locode {
                 .map(|sd| crate::normalize(sd).into()),
             subdivision_code: r.get("subdivision_code").map(|sd| normalize(sd).into()),
             function_code: normalize(extract_field(&r, "function_code")?).into(),
+            coordinages: None,
         })
     }
 }
@@ -363,5 +368,65 @@ fn extract_field<'a>(hm: &'a HashMap<String, String>, field: &str) -> serde_json
             let err = format!("Missing field {}", field);
             Err(serde_json::error::Error::custom(err))
         }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct CsvLocode {
+    #[serde(rename = "Country")]
+    pub country: String,
+    #[serde(rename = "Location")]
+    pub subcode: String,
+    #[serde(rename = "Name")]
+    pub name: String,
+    #[serde(rename = "NameWoDiacritics")]
+    pub name_wo_diacritics: String,
+    #[serde(rename = "Subdivision")]
+    pub subdivision_code: String,
+    #[serde(rename = "Status")]
+    pub status: String,
+    #[serde(rename = "Function")]
+    pub function: String,
+    #[serde(rename = "Date")]
+    pub date: String,
+    #[serde(rename = "IATA")]
+    pub iata_code: String,
+    #[serde(rename = "Coordinates")]
+    pub coordinates: Option<String>,
+}
+
+impl CsvLocode {
+    pub fn key(&self) -> Ustr {
+        let k = format!("{}:{}", normalize(&self.country), normalize(&self.subcode));
+        let key = format!("{}#{}", LOCODE_ENCODING, k);
+        key.into()
+    }
+    pub fn subdiv_key(&self) -> Ustr {
+        let k = format!(
+            "{}:{}",
+            normalize(&self.country),
+            normalize(&self.subdivision_code)
+        );
+        let key = format!("{}#{}", SUBDIV_ENCODING, k);
+        key.into()
+    }
+    pub fn country_key(&self) -> Ustr {
+        let k = format!("{}#{}", STATE_ENCODING, normalize(&self.country));
+        k.into()
+    }
+    pub fn parse_coordinates(&self) -> Option<Coordinates> {
+        self.coordinates
+            .as_ref()
+            .map(|c| match coordinates::coordinate_parser(c) {
+                Ok((_, coord)) => Some(coord),
+                Err(e) => {
+                    error!(
+                        "Error parsing coordinates for {} {} from {:?}. Error: {:?}",
+                        self.country, self.name, self.coordinates, e
+                    );
+                    None
+                }
+            })
+            .flatten()
     }
 }

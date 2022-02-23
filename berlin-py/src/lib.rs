@@ -4,7 +4,7 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 
 use berlin_core::location::Location;
-use berlin_core::locations_db::{parse_json_files, LocationsDb};
+use berlin_core::locations_db::{parse_data_files, LocationsDb};
 use berlin_core::search::SearchTerm;
 
 #[pyclass]
@@ -75,7 +75,7 @@ impl LocationProxy {
 #[pyfunction]
 fn load(data_dir: String) -> PyResult<LocationsDbProxy> {
     let data_path = PathBuf::from(data_dir);
-    let db = parse_json_files(data_path);
+    let db = parse_data_files(data_path);
     let db_proxy = LocationsDbProxy { _db: db };
     Ok(db_proxy)
 }

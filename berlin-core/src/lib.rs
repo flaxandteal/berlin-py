@@ -6,6 +6,7 @@ pub use rayon;
 pub use smallvec;
 pub use ustr;
 
+pub mod coordinates;
 mod graph;
 pub mod location;
 pub mod locations_db;

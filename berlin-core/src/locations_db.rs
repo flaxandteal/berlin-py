@@ -54,7 +54,7 @@ impl LocationsDb {
             .collect::<Vec<_>>();
         words_vec.sort_unstable_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
         let fst = fst::Map::from_iter(
-            self.by_word_vec
+            words_vec
                 .iter()
                 .enumerate()
                 .map(|(i, (word, _))| (word.as_str(), i as u64)),
@@ -145,7 +145,7 @@ pub fn parse_data_files(data_dir: PathBuf) -> LocationsDb {
             other => panic!("Expected a JSON object: {other:?}"),
         }
     });
-    let mut db = db.into_inner().expect("rw lock extract").mk_fst();
+    let mut db = db.into_inner().expect("rw lock extract");
     let csv_file = data_dir.join("code-list_csv.csv");
     let csv_file_open = File::open(csv_file).expect("Read CSV File");
     let mut csv_reader = ReaderBuilder::new().from_reader(csv_file_open);
@@ -170,5 +170,5 @@ pub fn parse_data_files(data_dir: PathBuf) -> LocationsDb {
     }
     let count = db.all.len();
     info!("parsed {} locations in: {:.2?}", count, start.elapsed());
-    db
+    db.mk_fst()
 }

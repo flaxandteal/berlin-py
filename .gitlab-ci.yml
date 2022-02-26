@@ -5,16 +5,18 @@ variables:
   # Tell 'docker:dind' to enable TLS (recommended)
   # and generate certificates in the specified directory.
   DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_DRIVER: overlay
+  DOCKER_HOST: tcp://localhost:2375/
 
-build-push-docker-image-job:
-  # Specify a Docker image to run the job in.
+services:
+  - docker:18.09.7-dind
+
+before_script:
+  - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN registry.gitlab.com
+
+build:
   image: docker:20.10
-  # Specify an additional image 'docker:dind' ("Docker-in-Docker") that
-  # will start up the Docker daemon when it is brought up by a runner.
-  services:
-    - docker:dind
   script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     # cache
     - rm .dockerignore
     - docker pull "$CACHING_LAYER_TAG" || true

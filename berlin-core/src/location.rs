@@ -65,8 +65,8 @@ impl Location {
                 panic!("Unexpected location standard {}", other)
             }
         };
-        let id: Ustr = r.i.into();
-        let key = format!("{}#{}", encoding.as_str(), normalize(id.as_str()));
+        let id: Ustr = normalize(r.i.as_str()).into();
+        let key = format!("{}#{}", encoding.as_str(), id.as_str());
         let mut loc = Self {
             key: Ustr::from(&key),
             id,
@@ -169,6 +169,23 @@ impl Location {
             LocData::Airp(d) => d.country,
         }
     }
+    pub fn get_subdiv(&self) -> Option<Ustr> {
+        match self.data {
+            LocData::St(_st) => None,
+            LocData::Subdv(sd) => Some(sd.subcode),
+            LocData::Locd(loc) => loc.subdivision_code,
+            LocData::Airp(a) => {
+                let sd = a
+                    .region
+                    .split("-")
+                    .collect::<Vec<_>>()
+                    .get(1)
+                    .map(|s| Ustr::from_existing(s))
+                    .flatten();
+                sd
+            }
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Clone, Copy)]
@@ -200,9 +217,9 @@ impl LocData {
 
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct State {
-    name: Ustr,
+    pub(crate) name: Ustr,
     short: Ustr,
-    alpha2: Ustr,
+    pub(crate) alpha2: Ustr,
     alpha3: Ustr,
     continent: Ustr,
 }
@@ -241,7 +258,7 @@ pub struct SubDivKey {
 
 #[derive(Debug, Copy, Clone, Serialize)]
 pub struct Subdivision {
-    name: Ustr,
+    pub(crate) name: Ustr,
     pub(crate) supercode: Ustr,
     pub(crate) subcode: Ustr,
     level: Ustr,

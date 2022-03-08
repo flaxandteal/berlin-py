@@ -10,6 +10,7 @@ use berlin_core::location::Location;
 use berlin_core::locations_db::LocationsDb;
 use berlin_core::search::SearchTerm;
 use berlin_core::smallvec::SmallVec;
+use berlin_core::ustr::Ustr;
 
 #[derive(Debug, Deserialize)]
 pub struct SearchParams {
@@ -62,15 +63,33 @@ pub struct ResLocation {
     id: &'static str,
     names: SmallVec<[&'static str; 1]>,
     codes: SmallVec<[&'static str; 1]>,
+    state: (&'static str, &'static str),
+    subdiv: Option<(&'static str, &'static str)>,
 }
 
 impl ResLocation {
-    pub fn from_location(l: &Location) -> Self {
+    pub fn from_location(db: &LocationsDb, l: &Location) -> Self {
+        let state_code = l.get_state();
+        let state_name: Ustr = *db
+            .state_by_code
+            .get(&state_code)
+            .unwrap_or(&"#UNKNOWN COUNTRY#".into());
+        let subdiv = l
+            .get_subdiv()
+            .map(|sd| -> Option<(&'static str, &'static str)> {
+                let code_str = format!("{}:{}", state_code.as_str(), sd.as_str());
+                let code = Ustr::from_existing(code_str.as_str())?;
+                let name = db.subdiv_by_code.get(&code)?;
+                Some((code.as_str(), name.as_str()))
+            })
+            .flatten();
         Self {
             encoding: l.encoding.as_str(),
             id: l.id.as_str(),
             names: l.get_names().into_iter().map(|u| u.as_str()).collect(),
             codes: l.get_codes().into_iter().map(|u| u.as_str()).collect(),
+            state: (state_code.as_str(), state_name.as_str()),
+            subdiv,
         }
     }
 }
@@ -88,7 +107,7 @@ pub async fn search_handler(
         .map(|(key, score)| {
             let loc: Location = state.all.get(&key).cloned().expect("loc should be in db");
             SearchResult {
-                loc: ResLocation::from_location(&loc),
+                loc: ResLocation::from_location(&state, &loc),
                 score,
             }
         })

@@ -11,7 +11,7 @@ use tracing::{info, warn};
 use berlin_core::locations_db;
 use berlin_core::locations_db::LocationsDb;
 use berlin_core::search::SearchTerm;
-use berlin_web::{init_logging, search_handler};
+use berlin_web::{init_logging, search_handler, fetch_handler};
 
 #[derive(StructOpt)]
 struct CliArgs {
@@ -38,6 +38,7 @@ async fn main() {
         let db = Arc::new(db);
         let app = Router::new()
             .route("/berlin/search", get(search_handler::search_handler))
+            .route("/berlin/code/:key", get(fetch_handler::fetch_handler))
             .route(
                 "/berlin/search-schema",
                 get(search_handler::search_schema_handler),

@@ -162,6 +162,7 @@ dependencies = [
  "tracing-futures",
  "tracing-log",
  "tracing-subscriber",
+ "ustr",
 ]
 
 [[package]]

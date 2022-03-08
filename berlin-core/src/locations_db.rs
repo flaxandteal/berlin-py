@@ -108,7 +108,13 @@ impl LocationsDb {
 }
 
 pub fn parse_data_files(data_dir: PathBuf) -> LocationsDb {
-    let files = vec!["state.json", "subdivision.json", "locode.json", "iata.json"];
+    let files = vec![
+        "state.json",
+        "subdivision.json",
+        "locode.json",
+        "iata.json",
+        "ISO-3166-2:GB.json",
+    ];
     let start = Instant::now();
     let db = LocationsDb::default();
     let db = RwLock::new(db);

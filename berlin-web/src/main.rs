@@ -11,7 +11,9 @@ use tracing::{info, warn};
 use berlin_core::locations_db;
 use berlin_core::locations_db::LocationsDb;
 use berlin_core::search::SearchTerm;
-use berlin_web::{init_logging, search_handler, fetch_handler};
+use berlin_web::fetch_handler::fetch_schema_handler;
+use berlin_web::search_handler::search_schema_handler;
+use berlin_web::{fetch_handler::fetch_handler, init_logging, search_handler::search_handler};
 
 #[derive(StructOpt)]
 struct CliArgs {
@@ -37,12 +39,10 @@ async fn main() {
     } else {
         let db = Arc::new(db);
         let app = Router::new()
-            .route("/berlin/search", get(search_handler::search_handler))
-            .route("/berlin/code/:key", get(fetch_handler::fetch_handler))
-            .route(
-                "/berlin/search-schema",
-                get(search_handler::search_schema_handler),
-            )
+            .route("/berlin/search", get(search_handler))
+            .route("/berlin/search-schema", get(search_schema_handler))
+            .route("/berlin/code/:key", get(fetch_handler))
+            .route("/berlin/fetch-schema", get(fetch_schema_handler))
             .route("/health", get(health_check_handler))
             .layer(AddExtensionLayer::new(db))
             .layer(TraceLayer::new_for_http());

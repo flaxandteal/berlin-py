@@ -10,7 +10,7 @@ use rayon::iter::{
     IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator,
 };
 use serde_json::Value;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info};
 use ustr::{Ustr, UstrMap, UstrSet};
 
 use crate::graph::ResultsGraph;
@@ -21,6 +21,10 @@ use crate::SEARCH_INCLUSION_THRESHOLD;
 #[derive(Default)]
 pub struct LocationsDb {
     pub all: UstrMap<Location>,
+    // state names by code
+    pub state_by_code: UstrMap<Ustr>,
+    // key is in format "gb:lon", value is name
+    pub subdiv_by_code: UstrMap<Ustr>,
     pub by_word_map: UstrMap<UstrSet>,
     pub by_word_vec: Vec<(Ustr, UstrSet)>,
     pub fst: fst::Map<Vec<u8>>,
@@ -28,6 +32,16 @@ pub struct LocationsDb {
 
 impl LocationsDb {
     pub fn insert(&mut self, l: Location) {
+        match &l.data {
+            LocData::St(s) => {
+                self.state_by_code.insert(s.alpha2, s.name);
+            }
+            LocData::Subdv(sd) => {
+                self.subdiv_by_code.insert(l.id, sd.name);
+            }
+            LocData::Locd(_) => {}
+            LocData::Airp(_) => {}
+        }
         self.all.insert(l.key, l);
     }
     pub fn mk_fst(self) -> Self {
@@ -62,6 +76,8 @@ impl LocationsDb {
         .expect("Build FST");
         LocationsDb {
             all: self.all,
+            state_by_code: self.state_by_code,
+            subdiv_by_code: self.subdiv_by_code,
             by_word_map: words_map,
             by_word_vec: words_vec,
             fst,
@@ -108,7 +124,13 @@ impl LocationsDb {
 }
 
 pub fn parse_data_files(data_dir: PathBuf) -> LocationsDb {
-    let files = vec!["state.json", "subdivision.json", "locode.json", "iata.json"];
+    let files = vec![
+        "state.json",
+        "subdivision.json",
+        "locode.json",
+        "iata.json",
+        "ISO-3166-2:GB.json",
+    ];
     let start = Instant::now();
     let db = LocationsDb::default();
     let db = RwLock::new(db);
@@ -156,7 +178,7 @@ pub fn parse_data_files(data_dir: PathBuf) -> LocationsDb {
         let key = &csv_loc.key();
         match db.all.get_mut(key) {
             None => {
-                warn!("#{} LOCODE not found in db: {} {:?}", nerrs, key, csv_loc);
+                debug!("#{} LOCODE not found in db: {} {:?}", nerrs, key, csv_loc);
                 nerrs += 1;
             }
             Some(loc) => {

@@ -80,7 +80,7 @@ impl ResLocation {
                 let code_str = format!("{}:{}", state_code.as_str(), sd.as_str());
                 let code = Ustr::from_existing(code_str.as_str())?;
                 let name = db.subdiv_by_code.get(&code)?;
-                Some((code.as_str(), name.as_str()))
+                Some((sd.as_str(), name.as_str()))
             })
             .flatten();
         Self {

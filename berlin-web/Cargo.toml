@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ustr = { version = "0.8.1", features = ["serde", "serialization"] }
 berlin-core = { path = "../berlin-core" }
 dirs = "4.0.0"
 promptly = "0.3.0"

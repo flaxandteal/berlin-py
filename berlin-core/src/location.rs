@@ -25,7 +25,7 @@ pub struct AnyLocation {
 const STATE_ENCODING: &str = "ISO-3166-1";
 
 pub fn state_key(state_code: Ustr) -> Option<Ustr> {
-    let str = format!("{}#{}", STATE_ENCODING, state_code.as_str());
+    let str = format!("{}-{}", STATE_ENCODING, state_code.as_str());
     Ustr::from_existing(str.as_str())
 }
 
@@ -33,7 +33,7 @@ const SUBDIV_ENCODING: &str = "ISO-3166-2";
 
 pub fn subdiv_key(state_code: Ustr, subdiv_code: Ustr) -> Option<Ustr> {
     let str = format!(
-        "{}#{}:{}",
+        "{}-{}:{}",
         SUBDIV_ENCODING,
         state_code.as_str(),
         subdiv_code.as_str()
@@ -66,7 +66,7 @@ impl Location {
             }
         };
         let id: Ustr = normalize(r.i.as_str()).into();
-        let key = format!("{}#{}", encoding.as_str(), id.as_str());
+        let key = format!("{}-{}", encoding.as_str(), id.as_str());
         let mut loc = Self {
             key: Ustr::from(&key),
             id,
@@ -415,7 +415,7 @@ pub struct CsvLocode {
 impl CsvLocode {
     pub fn key(&self) -> Ustr {
         let k = format!("{}:{}", normalize(&self.country), normalize(&self.subcode));
-        let key = format!("{}#{}", LOCODE_ENCODING, k);
+        let key = format!("{}-{}", LOCODE_ENCODING, k);
         key.into()
     }
     pub fn subdiv_key(&self) -> Ustr {
@@ -424,11 +424,11 @@ impl CsvLocode {
             normalize(&self.country),
             normalize(&self.subdivision_code)
         );
-        let key = format!("{}#{}", SUBDIV_ENCODING, k);
+        let key = format!("{}-{}", SUBDIV_ENCODING, k);
         key.into()
     }
     pub fn country_key(&self) -> Ustr {
-        let k = format!("{}#{}", STATE_ENCODING, normalize(&self.country));
+        let k = format!("{}-{}", STATE_ENCODING, normalize(&self.country));
         k.into()
     }
     pub fn parse_coordinates(&self) -> Option<Coordinates> {

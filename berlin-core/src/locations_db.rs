@@ -109,7 +109,7 @@ impl LocationsDb {
             .filter_map(|key| {
                 let loc = self.all.get(key).unwrap();
                 let score = loc.search(&st);
-                match score > SEARCH_INCLUSION_THRESHOLD || pre_filtered.len() < 1000 {
+                match score > SEARCH_INCLUSION_THRESHOLD {
                     true => Some((*key, score)),
                     false => None,
                 }

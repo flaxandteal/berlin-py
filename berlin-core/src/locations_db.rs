@@ -5,7 +5,7 @@ use std::sync::RwLock;
 use std::time::Instant;
 
 use csv::ReaderBuilder;
-use fst::{Automaton, IntoStreamer, Streamer};
+use fst::{Automaton, Streamer};
 use rayon::iter::{
     IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator,
 };
@@ -83,7 +83,7 @@ impl LocationsDb {
             fst,
         }
     }
-    pub fn search(&self, st: &SearchTerm, limit: usize) -> Vec<(Ustr, i64)> {
+    pub fn search(&self, st: &SearchTerm) -> Vec<(Ustr, i64)> {
         let mut pre_filtered: UstrSet = UstrSet::default();
         st.exact_matches.iter().for_each(|term| {
             if let Some(locs) = self.by_word_map.get(term) {
@@ -91,19 +91,24 @@ impl LocationsDb {
             };
         });
         let not_exact = st.not_exact_matches.iter().map(|ne| ne.as_str());
-        not_exact.for_each(|term| {
-            if term.len() > 3 {
-                let prefix_matcher = fst::automaton::Str::new(term).starts_with();
-                let union = fst::automaton::Levenshtein::new(term, 2)
-                    .expect("build automaton")
-                    .union(prefix_matcher);
-                let mut stream = self.fst.search(union).into_stream();
-                while let Some((_, v)) = stream.next() {
-                    let (_, locs) = self.by_word_vec.get(v as usize).unwrap();
-                    pre_filtered.extend(locs);
+        let mut stream = not_exact
+            .fold(fst::map::OpBuilder::new(), |op, term| {
+                match term.len() > 3 {
+                    true => {
+                        let prefix_matcher = fst::automaton::Str::new(term).starts_with();
+                        let autom = fst::automaton::Levenshtein::new(term, st.lev_dist)
+                            .expect("build automaton")
+                            .union(prefix_matcher);
+                        op.add(self.fst.search(autom))
+                    }
+                    false => op,
                 }
-            }
-        });
+            })
+            .union();
+        while let Some((_, v)) = stream.next() {
+            let (_, locs) = self.by_word_vec.get(v[0].value as usize).unwrap();
+            pre_filtered.extend(locs);
+        }
         let res = pre_filtered
             .par_iter()
             .filter_map(|key| {
@@ -118,7 +123,7 @@ impl LocationsDb {
         let res_graph = ResultsGraph::from_results(res, &self);
         let mut res = res_graph.scores.into_iter().collect::<Vec<_>>();
         res.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-        res.truncate(limit);
+        res.truncate(st.limit);
         res
     }
 }

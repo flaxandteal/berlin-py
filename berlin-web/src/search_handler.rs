@@ -17,6 +17,7 @@ pub struct SearchParams {
     q: String,
     limit: Option<usize>,
     state: Option<String>,
+    ld: Option<u32>,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -41,6 +42,8 @@ pub struct SearchTermJson {
     pub exact_matches: Vec<&'static str>,
     pub not_exact_matches: Vec<String>,
     pub state_filter: Option<&'static str>,
+    pub limit: usize,
+    pub levenshtein_distance: usize,
 }
 
 impl SearchTermJson {
@@ -53,6 +56,8 @@ impl SearchTermJson {
             exact_matches: t.exact_matches.into_iter().map(|u| u.as_str()).collect(),
             not_exact_matches: t.not_exact_matches,
             state_filter: t.state_filter.map(|u| u.as_str()),
+            limit: t.limit,
+            levenshtein_distance: t.lev_dist as usize,
         }
     }
 }
@@ -63,9 +68,14 @@ pub async fn search_handler(
 ) -> Json<SearchResults> {
     let start_time = Instant::now();
     let limit = params.limit.unwrap_or(1);
-    let st = SearchTerm::from_raw_query(params.q, params.state);
+    let lev_distance = match params.ld {
+        None => 2,
+        Some(ld) if ld > 2 => 2,
+        Some(ld) => ld,
+    };
+    let st = SearchTerm::from_raw_query(params.q, params.state, limit, lev_distance);
     let results = state
-        .search(&st, limit)
+        .search(&st)
         .into_iter()
         .map(|(key, score)| {
             let loc: Location = state.all.get(&key).cloned().expect("loc should be in db");

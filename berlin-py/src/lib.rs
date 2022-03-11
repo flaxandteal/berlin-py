@@ -24,13 +24,14 @@ impl LocationsDbProxy {
         query: String,
         state: Option<String>,
         limit: usize,
+        lev_distance: u32,
     ) -> PyResult<Vec<LocationProxy>> {
         let gil = Python::acquire_gil();
         let _py = gil.python();
-        let st = SearchTerm::from_raw_query(query, state);
+        let st = SearchTerm::from_raw_query(query, state, limit, lev_distance);
         let results = self
             ._db
-            .search(&st, limit)
+            .search(&st)
             .into_iter()
             .map(|(key, _score)| {
                 let loc = self

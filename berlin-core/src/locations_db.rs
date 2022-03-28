@@ -15,7 +15,7 @@ use ustr::{Ustr, UstrMap, UstrSet};
 
 use crate::graph::ResultsGraph;
 use crate::location::{AnyLocation, CsvLocode, LocData, Location};
-use crate::search::SearchTerm;
+use crate::search::{Score, SearchTerm};
 use crate::SEARCH_INCLUSION_THRESHOLD;
 
 #[derive(Default)]
@@ -83,14 +83,14 @@ impl LocationsDb {
             fst,
         }
     }
-    pub fn search(&self, st: &SearchTerm) -> Vec<(Ustr, i64)> {
+    pub fn search(&self, st: &SearchTerm) -> Vec<(Ustr, Score)> {
         let mut pre_filtered: UstrSet = UstrSet::default();
         st.exact_matches.iter().for_each(|term| {
-            if let Some(locs) = self.by_word_map.get(term) {
+            if let Some(locs) = self.by_word_map.get(&term.term) {
                 pre_filtered.extend(locs);
             };
         });
-        let not_exact = st.not_exact_matches.iter().map(|ne| ne.as_str());
+        let not_exact = st.not_exact_matches.iter().map(|ne| ne.term.as_str());
         let mut stream = not_exact
             .fold(fst::map::OpBuilder::new(), |op, term| {
                 match term.len() > 3 {
@@ -113,12 +113,13 @@ impl LocationsDb {
             .par_iter()
             .filter_map(|key| {
                 let loc = self.all.get(key).unwrap();
-                let score = loc.search(&st);
-                match score > SEARCH_INCLUSION_THRESHOLD {
-                    true => Some((*key, score)),
-                    false => None,
-                }
+                loc.search(st)
+                    .map(|score| match score.score > SEARCH_INCLUSION_THRESHOLD {
+                        true => Some((*key, score)),
+                        false => None,
+                    })
             })
+            .flatten()
             .collect::<UstrMap<_>>();
         let res_graph = ResultsGraph::from_results(res, &self);
         let mut res = res_graph.scores.into_iter().collect::<Vec<_>>();
@@ -169,7 +170,7 @@ pub fn parse_data_files(data_dir: PathBuf) -> LocationsDb {
                 info!("{file} decoded to native structs: {:.2?}", start.elapsed());
                 codes
             }
-            other => panic!("Expected a JSON object: {other:?}"),
+            other => panic!("Expected a JSON object: {:?}", other),
         }
     });
     let mut db = db.into_inner().expect("rw lock extract");

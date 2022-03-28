@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use berlin_core::location::Location;
 use berlin_core::locations_db::LocationsDb;
-use berlin_core::search::{Score, SearchTerm};
+use berlin_core::search::{Offset, SearchTerm};
 
 use crate::location_json::LocJson;
 
@@ -30,7 +30,8 @@ pub struct SearchResults {
 #[derive(Serialize, JsonSchema)]
 pub struct SearchResult {
     pub loc: LocJson,
-    pub score: Score,
+    pub score: i64,
+    pub offset: Offset,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -85,7 +86,8 @@ pub async fn search_handler(
             let loc: Location = state.all.get(&key).cloned().expect("loc should be in db");
             SearchResult {
                 loc: LocJson::from_location(&state, &loc),
-                score,
+                score: score.score,
+                offset: score.offset,
             }
         })
         .collect();

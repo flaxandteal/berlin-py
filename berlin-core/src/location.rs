@@ -8,7 +8,7 @@ use tracing::error;
 use ustr::{Ustr, UstrSet};
 
 use crate::coordinates::Coordinates;
-use crate::search::SearchTerm;
+use crate::search::{Score, SearchTerm};
 use crate::{
     coordinates, normalize, SCORE_SOFT_MAX, SINGLE_WORD_MATCH_PENALTY, STATE_CODE_BOOST,
     SUBDIV_CODE_BOOST,
@@ -93,31 +93,38 @@ impl Location {
             .collect();
         Ok(loc)
     }
-    pub fn search(&self, t: &SearchTerm) -> i64 {
+    pub fn search(&self, t: &SearchTerm) -> Option<Score> {
         if let Some(sf) = &t.state_filter {
             if self.get_state() != *sf {
-                return 0;
+                return None;
             }
         }
         let words_score = self
             .words
             .iter()
-            .map(|n| t.match_str(n) - SINGLE_WORD_MATCH_PENALTY)
+            .map(|n| {
+                t.match_str(n).map(|s| Score {
+                    score: s.score - SINGLE_WORD_MATCH_PENALTY,
+                    ..s
+                })
+            })
             .max()
-            .unwrap_or(0);
-        let score = match &self.data {
+            .flatten();
+        let score: Option<Score> = match &self.data {
             LocData::St(d) => {
                 let codes = d.get_codes();
-                if codes.iter().any(|c| t.codes.contains(c)) {
-                    return SCORE_SOFT_MAX + STATE_CODE_BOOST;
+                let code_match = t.codes_match(codes.as_slice(), SCORE_SOFT_MAX + STATE_CODE_BOOST);
+                match code_match {
+                    Some(c) => Some(c.clone()),
+                    None => t.match_str(&d.name),
                 }
-                t.match_str(&d.name)
             }
             LocData::Subdv(d) => {
-                if t.codes.contains(&d.subcode) {
-                    return SCORE_SOFT_MAX + SUBDIV_CODE_BOOST;
+                let code_match = t.codes_match(&[d.subcode], SCORE_SOFT_MAX + SUBDIV_CODE_BOOST);
+                match code_match {
+                    Some(c) => Some(c),
+                    None => t.match_str(&d.name),
                 }
-                t.match_str(&d.name)
             }
             LocData::Locd(d) => max(t.match_str(&d.name), t.match_str(&d.subcode)),
             LocData::Airp(d) => max(t.match_str(&d.name), t.match_str(&d.iata)),

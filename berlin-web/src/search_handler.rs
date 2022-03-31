@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use berlin_core::location::Location;
 use berlin_core::locations_db::LocationsDb;
-use berlin_core::search::SearchTerm;
+use berlin_core::search::{Offset, SearchTerm};
 
 use crate::location_json::LocJson;
 
@@ -31,6 +31,7 @@ pub struct SearchResults {
 pub struct SearchResult {
     pub loc: LocJson,
     pub score: i64,
+    pub offset: Offset,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -52,9 +53,13 @@ impl SearchTermJson {
             raw: t.raw,
             normalized: t.normalized,
             stop_words: t.stop_words.into_iter().map(|u| u.as_str()).collect(),
-            codes: t.codes.into_iter().map(|u| u.as_str()).collect(),
-            exact_matches: t.exact_matches.into_iter().map(|u| u.as_str()).collect(),
-            not_exact_matches: t.not_exact_matches,
+            codes: t.codes.into_iter().map(|u| u.term.as_str()).collect(),
+            exact_matches: t
+                .exact_matches
+                .into_iter()
+                .map(|u| u.term.as_str())
+                .collect(),
+            not_exact_matches: t.not_exact_matches.into_iter().map(|ne| ne.term).collect(),
             state_filter: t.state_filter.map(|u| u.as_str()),
             limit: t.limit,
             levenshtein_distance: t.lev_dist as usize,
@@ -81,7 +86,8 @@ pub async fn search_handler(
             let loc: Location = state.all.get(&key).cloned().expect("loc should be in db");
             SearchResult {
                 loc: LocJson::from_location(&state, &loc),
-                score,
+                score: score.score,
+                offset: score.offset,
             }
         })
         .collect();

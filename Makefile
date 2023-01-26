@@ -18,4 +18,5 @@ build: Dockerfile
 
 .PHONY: run
 run: build
-	docker run -ti --rm berlin_rs
+	docker run -p 3001:3001 --name berlin -ti --rm berlin_rs
+ 

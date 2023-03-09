@@ -3,7 +3,7 @@
 
 ## STAGE 1 - Core package(s)
 
-FROM konstin2/maturin as maturin
+FROM ghcr.io/pyo3/maturin:main as maturin
 
 ADD . /app/build
-WORKDIR /app/build/berlin-py
+WORKDIR /app/build

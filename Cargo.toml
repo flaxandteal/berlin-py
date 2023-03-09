@@ -1,12 +1,26 @@
-[workspace]
-members = ["berlin-py"]
+[package]
+name = "berlin-py"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Identify locations and tag them with UN-LOCODEs and ISO-3166-2 subdivisions."
+readme = "README.md"
+repository = "https://github.com/flaxandteal/berlin-py"
+keywords = ["geospatial", "nlp", "search"]
+categories = ["science::geo", "text-processing"]
 
-[profile.dev]
-split-debuginfo = "unpacked"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "berlin"
+crate-type = ["cdylib"]
 
-[profile.release]
-incremental = true
-debug = true
-opt-level = 3
-lto = "thin"
-
+[dependencies]
+pyo3 = { version = "0.15.1", features = ["extension-module"] }
+serde = { version = "1.0.133", features = ["derive"] }
+serde_json = "1.0.74"
+berlin-core = "0.2.0"
+# Logging
+tracing = "0.1.29"
+tracing-futures = "0.2.5"
+tracing-log = "0.1.2"
+tracing-subscriber = "0.3.1"

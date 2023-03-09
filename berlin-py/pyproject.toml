@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "berlin"
-version = "0.1.0"
+version = "0.3.0"
 description = ""
 authors = [
     "Metin Akat <metin.akat@flaxandteal.co.uk>",

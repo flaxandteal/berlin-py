@@ -12,19 +12,11 @@ BUILD=build
 .PHONY: all
 all: build
 
-.PHONY: wheels
-wheels:
-	@mkdir -p $(BUILD)/wheels
-	docker build -t berlin_py_build -f Dockerfile.wheels .
-	docker run --platform "linux/amd64" --rm --entrypoint maturin -v $(shell pwd)/$(BUILD)/wheels:/app/build/target/wheels berlin_py_build build
-
 .PHONY: build
-build: Dockerfile ## Builds ./Dockerfile image name: berlin_rs
-	docker build -t berlin_rs .
-
-.PHONY: run
-run: build ## First builds ./Dockerfile with image name: berlin_rs and then runs a container, with name: berlin, on port 3001
-	docker run -p 3001:3001 --name berlin -ti --rm berlin_rs
+build:
+	@mkdir -p $(BUILD)/wheels
+	docker build -t berlin_py_build -f Dockerfile .
+	docker run --platform "linux/amd64" --rm --entrypoint maturin -v $(shell pwd)/$(BUILD)/wheels:/app/build/target/wheels berlin_py_build build
 
  
 help: ## Show this help.

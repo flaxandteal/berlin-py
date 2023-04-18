@@ -4,3 +4,5 @@
 flamegraph.svg
 build/
 target/
+__pycache__/
+*.so

@@ -30,7 +30,8 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "berlin-core"
-version = "0.2.0"
+version = "0.2.1"
+source = "git+https://gitlab.com/flaxandteal/onyx/berlin-rs?branch=feature/expose-additional-python-loading-methods#992f80871d087cc70febd119011587a7ea6a6a0e"
 dependencies = [
  "ahash",
  "csv",

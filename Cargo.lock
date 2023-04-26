@@ -31,7 +31,8 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 [[package]]
 name = "berlin-core"
 version = "0.2.1"
-source = "git+https://gitlab.com/flaxandteal/onyx/berlin-rs?branch=feature/expose-additional-python-loading-methods#992f80871d087cc70febd119011587a7ea6a6a0e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7cd9adfd3d711e1292aabfda7ebaf128b806e426d02815d49311dfb6d2d7cf7"
 dependencies = [
  "ahash",
  "csv",

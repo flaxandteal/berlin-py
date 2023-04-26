@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use rayon::iter::{
-    IntoParallelIterator, IntoParallelRefIterator, ParallelIterator, ParallelBridge, IndexedParallelIterator, Enumerate
+    IntoParallelIterator, IntoParallelRefIterator, ParallelIterator, IndexedParallelIterator
 };
 
 use berlin_core::location::{Location, CsvLocode};

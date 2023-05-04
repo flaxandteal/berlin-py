@@ -16,7 +16,7 @@ all: build
 build:
 	@mkdir -p $(BUILD)/wheels
 	docker build -t berlin_py_build -f Dockerfile .
-	docker run --platform "linux/amd64" --entrypoint maturin -v $(shell pwd)/$(BUILD)/wheels:/app/build/target/wheels berlin_py_build build
+	docker run --platform "linux/amd64" --entrypoint maturin -v $(shell pwd)/$(BUILD)/wheels:/app/build/target/wheels berlin_py_build -f build
 
  
 help: ## Show this help.

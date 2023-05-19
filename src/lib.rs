@@ -28,27 +28,27 @@ impl LocationsDbProxy {
     fn query(
         &self,
         query: String,
-        state: Option<String>,
         limit: usize,
         lev_distance: u32,
+        state: Option<String>,
     ) -> PyResult<Vec<LocationProxy>> {
-        let gil = Python::with_gil();
-        let _py = gil.python();
-        let st = SearchTerm::from_raw_query(query, state, limit, lev_distance);
-        let results = self
-            ._db
-            .search(&st)
-            .into_iter()
-            .map(|(key, _score)| {
-                let loc = self
-                    ._db
-                    .all
-                    .get(&key)
-                    .cloned()
-                    .expect("loc should be in db");
-                LocationProxy { _loc: loc }
-            })
-            .collect();
+        let results = Python::with_gil(|_py| {
+            let st = SearchTerm::from_raw_query(query, state, limit, lev_distance);
+            self
+                ._db
+                .search(&st)
+                .into_iter()
+                .map(|(key, _score)| {
+                    let loc = self
+                        ._db
+                        .all
+                        .get(&key)
+                        .cloned()
+                        .expect("loc should be in db");
+                    LocationProxy { _loc: loc }
+                })
+                .collect()
+        });
         Ok(results)
     }
 }
@@ -56,25 +56,26 @@ impl LocationsDbProxy {
 #[pymethods]
 impl LocationProxy {
     fn __getattr__(&self, attr: String) -> PyResult<PyObject> {
-        let gil = Python::with_gil();
-        let py = gil.python();
-        let val = match attr.as_str() {
-            "key" => self._loc.key.to_string().to_object(py),
-            "encoding" => self._loc.encoding.to_string().to_object(py),
-            "id" => self._loc.id.to_string().to_object(py),
-            "words" => self
-                ._loc
-                .words
-                .iter()
-                .map(|word| word.to_string())
-                .collect::<Vec<_>>()
-                .to_object(py),
-            _ => {
-                let err = PyTypeError::new_err("AttributeError");
-                return Err(err);
-            }
-        };
-        Ok(val)
+        let val = Python::with_gil(|py| {
+            let val = match attr.as_str() {
+                "key" => self._loc.key.to_string().to_object(py),
+                "encoding" => self._loc.encoding.to_string().to_object(py),
+                "id" => self._loc.id.to_string().to_object(py),
+                "words" => self
+                    ._loc
+                    .words
+                    .iter()
+                    .map(|word| word.to_string())
+                    .collect::<Vec<_>>()
+                    .to_object(py),
+                _ => {
+                    let err = PyTypeError::new_err("AttributeError");
+                    return Err(err);
+                }
+            };
+            Ok(val)
+        });
+        Ok(val.unwrap())
     }
 }
 

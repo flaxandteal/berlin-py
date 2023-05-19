@@ -105,17 +105,17 @@ jobs:
       with:
         target: ${{ matrix.target }}
         manylinux: auto
-        args: --release --out dist -m Cargo.toml
+        args: --release --out build/wheels -m Cargo.toml
     - name: Install built wheel
       if: matrix.target == 'x86_64'
       run: |
-        pip install berlin --no-index --find-links dist --force-reinstall
+        pip install berlin --no-index --find-links build/wheels --force-reinstall
         python -c "import berlin"
     - name: Upload wheels
       uses: actions/upload-artifact@v3
       with:
         name: wheels
-        path: dist
+        path: build/wheels
 
   linux-cross:
     runs-on: ubuntu-latest

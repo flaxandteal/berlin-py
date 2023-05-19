@@ -230,7 +230,7 @@ fn load(data_dir: String) -> PyResult<LocationsDbProxy> {
 
 /// A Python module implemented in Rust.
 #[pymodule]
-#[pyo3(name="_berlin")]
+#[pyo3(name = "_berlin")]
 fn berlin(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(load, m)?)?;
     m.add_function(wrap_pyfunction!(load_from_json, m)?)?;

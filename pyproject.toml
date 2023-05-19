@@ -12,7 +12,7 @@ version = "0.3.7"
 description = "Identify locations and tag them with UN-LOCODEs and ISO-3166-2 subdivisions."
 readme = "README.md"
 license = {file = "LICENSE.md"}
-requires-python = ">=3.6"
+requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",

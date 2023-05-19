@@ -34,8 +34,7 @@ impl LocationsDbProxy {
     ) -> PyResult<Vec<LocationProxy>> {
         let results = Python::with_gil(|_py| {
             let st = SearchTerm::from_raw_query(query, state, limit, lev_distance);
-            self
-                ._db
+            self._db
                 .search(&st)
                 .into_iter()
                 .map(|(key, _score)| {

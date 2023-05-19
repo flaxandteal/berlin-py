@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=0.12,<0.13"]
+requires = ["maturin>=0.15,<0.16"]
 build-backend = "maturin"
 
 [project]
@@ -8,14 +8,17 @@ authors = [
     {name = "Metin Akat", email = "metin.akat@flaxandteal.co.uk"},
     {name = "Phil Weir", email = "phil.weir@flaxandteal.co.uk"}
 ]
-version = "0.3.3"
+version = "0.3.7"
 description = "Identify locations and tag them with UN-LOCODEs and ISO-3166-2 subdivisions."
 readme = "README.md"
 license = {file = "LICENSE.md"}
-requires-python = ">=3.6"
+requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 
+[tool.maturin]
+python-source = "python"
+module-name = "berlin._berlin"

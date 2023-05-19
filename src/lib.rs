@@ -32,7 +32,7 @@ impl LocationsDbProxy {
         limit: usize,
         lev_distance: u32,
     ) -> PyResult<Vec<LocationProxy>> {
-        let gil = Python::acquire_gil();
+        let gil = Python::with_gil();
         let _py = gil.python();
         let st = SearchTerm::from_raw_query(query, state, limit, lev_distance);
         let results = self
@@ -56,7 +56,7 @@ impl LocationsDbProxy {
 #[pymethods]
 impl LocationProxy {
     fn __getattr__(&self, attr: String) -> PyResult<PyObject> {
-        let gil = Python::acquire_gil();
+        let gil = Python::with_gil();
         let py = gil.python();
         let val = match attr.as_str() {
             "key" => self._loc.key.to_string().to_object(py),

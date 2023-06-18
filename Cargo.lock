@@ -56,7 +56,7 @@ dependencies = [
 
 [[package]]
 name = "berlin-py"
-version = "0.1.0"
+version = "0.3.8"
 dependencies = [
  "berlin-core",
  "pyo3",

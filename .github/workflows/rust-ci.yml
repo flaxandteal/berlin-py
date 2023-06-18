@@ -24,7 +24,7 @@
 
 on: [push, pull_request]
 
-name: CI
+name: Pure Rust
 
 jobs:
   check:

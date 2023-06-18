@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use pyo3::exceptions::{PyTypeError, PyKeyError, PyAttributeError};
+use pyo3::exceptions::{PyAttributeError, PyKeyError, PyTypeError};
 use pyo3::prelude::*;
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
@@ -18,21 +18,16 @@ struct LocationsDbProxy {
     _db: LocationsDb,
 }
 
-#[pyclass(name="Location")]
+#[pyclass(name = "Location")]
 struct LocationProxy {
     _loc: Location,
 }
 
 #[pymethods]
 impl LocationsDbProxy {
-    fn retrieve(
-        &self,
-        term: String
-    ) -> PyResult<LocationProxy> {
+    fn retrieve(&self, term: String) -> PyResult<LocationProxy> {
         match self._db.retrieve(term.as_str()) {
-            Some(loc) => Python::with_gil(|_py| {
-                Ok(LocationProxy { _loc: loc })
-            }),
+            Some(loc) => Python::with_gil(|_py| Ok(LocationProxy { _loc: loc })),
             None => {
                 let err = PyKeyError::new_err(format!["{} not found", term.as_str()]);
                 Err(err)

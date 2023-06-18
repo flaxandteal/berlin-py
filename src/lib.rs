@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use berlin_core::ustr::Ustr;
 use pyo3::exceptions::{PyAttributeError, PyKeyError, PyTypeError};
+use pyo3::types::{PyList};
 use pyo3::prelude::*;
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
@@ -32,6 +34,41 @@ impl LocationsDbProxy {
                 let err = PyKeyError::new_err(format!["{} not found", term.as_str()]);
                 Err(err)
             }
+        }
+    }
+
+    fn get_state_name(&self, state: &str) -> PyResult<&str> {
+        let code = match Ustr::from_existing(state) {
+            None => {
+                let err = PyKeyError::new_err(format!["{} not found as state key", state]);
+                return Err(err)
+            },
+            Some(code) => code
+        };
+        match self._db.state_by_code.get(&code) {
+            None => {
+                let err = PyKeyError::new_err(format!["{} not found as state key", state]);
+                Err(err)
+            },
+            Some(name) => Ok(name)
+        }
+    }
+
+    fn get_subdiv_name(&self, state: &str, subdiv: &str) -> PyResult<&str> {
+        let code_str = format!["{}:{}", state, subdiv];
+        let code = match Ustr::from_existing(code_str.as_str()) {
+            None => {
+                let err = PyKeyError::new_err(format!["{} not found as subdiv key", code_str]);
+                return Err(err)
+            },
+            Some(code) => code
+        };
+        match self._db.subdiv_by_code.get(&code) {
+            None => {
+                let err = PyKeyError::new_err(format!["{} not found as subdiv key", subdiv]);
+                Err(err)
+            },
+            Some(name) => Ok(name)
         }
     }
 
@@ -85,6 +122,39 @@ impl LocationProxy {
             Ok(val)
         });
         Ok(val.unwrap())
+    }
+
+    fn get_names(&self) -> PyResult<Py<PyAny>> {
+        let val: Result<_, PyAttributeError> = Python::with_gil(|py| {
+            let names: &PyList = PyList::new(
+                py,
+                self._loc.get_names().iter().map(|name| name.as_str())
+            );
+            Ok(names.into())
+        });
+        Ok(val.unwrap())
+    }
+
+    fn get_codes(&self) -> PyResult<Py<PyAny>> {
+        let val: Result<_, PyAttributeError> = Python::with_gil(|py| {
+            let codes: &PyList = PyList::new(
+                py,
+                self._loc.get_codes().iter().map(|code| code.as_str())
+            );
+            Ok(codes.into())
+        });
+        Ok(val.unwrap())
+    }
+
+    fn get_state(&self) -> &str {
+        self._loc.get_state().as_str()
+    }
+
+    fn get_subdiv(&self) -> Option<&str> {
+        match self._loc.get_subdiv() {
+            None => None,
+            Some(ustr) => Some(ustr.as_str())
+        }
     }
 }
 

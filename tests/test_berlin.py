@@ -21,3 +21,9 @@ def test_retrieve(db):
     assert loc.encoding == "UN-LOCODE"
     assert loc.id == "gb:abc"
     assert list(loc.words) == ["abercarn"]
+    assert loc.get_names() == ["abercarn"]
+    assert loc.get_codes() == ["abc"]
+    assert loc.get_state() == "gb"
+    assert loc.get_subdiv() == "cay"
+    assert db.get_state_name(loc.get_state()) == "united kingdom of great britain and northern ireland"
+    assert db.get_subdiv_name(loc.get_state(), loc.get_subdiv()) == "caerphilly [caerffili gb-caf]"

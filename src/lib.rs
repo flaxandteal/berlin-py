@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyTypeError, PyKeyError, PyAttributeError};
 use pyo3::prelude::*;
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
@@ -18,13 +18,28 @@ struct LocationsDbProxy {
     _db: LocationsDb,
 }
 
-#[pyclass]
+#[pyclass(name="Location")]
 struct LocationProxy {
     _loc: Location,
 }
 
 #[pymethods]
 impl LocationsDbProxy {
+    fn retrieve(
+        &self,
+        term: String
+    ) -> PyResult<LocationProxy> {
+        match self._db.retrieve(term.as_str()) {
+            Some(loc) => Python::with_gil(|_py| {
+                Ok(LocationProxy { _loc: loc })
+            }),
+            None => {
+                let err = PyKeyError::new_err(format!["{} not found", term.as_str()]);
+                Err(err)
+            }
+        }
+    }
+
     fn query(
         &self,
         query: String,
@@ -68,7 +83,7 @@ impl LocationProxy {
                     .collect::<Vec<_>>()
                     .to_object(py),
                 _ => {
-                    let err = PyTypeError::new_err("AttributeError");
+                    let err = PyAttributeError::new_err(format!["{} not found", attr.as_str()]);
                     return Err(err);
                 }
             };
@@ -232,6 +247,7 @@ fn load(data_dir: String) -> PyResult<LocationsDbProxy> {
 #[pymodule]
 #[pyo3(name = "_berlin")]
 fn berlin(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_class::<LocationProxy>()?;
     m.add_function(wrap_pyfunction!(load, m)?)?;
     m.add_function(wrap_pyfunction!(load_from_json, m)?)?;
     Ok(())

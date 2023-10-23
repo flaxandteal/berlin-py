@@ -30,14 +30,15 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "berlin-core"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59971a182c17e7e3fce85b0be2a80b78a5fd77c35ae7057dca7af655ce8e3ab8"
+checksum = "2849e4ad4cb3ca4cf83f4b9effcfa64a66028c642663c000f0f7a458f0d38892"
 dependencies = [
  "ahash",
  "csv",
  "deunicode",
  "fst",
+ "indextree",
  "nom",
  "petgraph",
  "rayon",
@@ -229,6 +230,12 @@ dependencies = [
  "autocfg",
  "hashbrown",
 ]
+
+[[package]]
+name = "indextree"
+version = "4.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c40411d0e5c63ef1323c3d09ce5ec6d84d71531e18daed0743fccea279d7deb6"
 
 [[package]]
 name = "indoc"

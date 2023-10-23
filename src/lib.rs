@@ -4,13 +4,13 @@ use std::sync::{Arc, Mutex};
 
 use berlin_core::ustr::Ustr;
 use pyo3::exceptions::{PyAttributeError, PyKeyError, PyTypeError};
-use pyo3::types::{PyList};
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
 
-use berlin_core::location::{CsvLocode, Location, subdiv_key};
+use berlin_core::location::{subdiv_key, CsvLocode, Location};
 use berlin_core::locations_db::{
     parse_data_blocks, parse_data_files, parse_data_list, LocationsDb,
 };
@@ -31,7 +31,12 @@ struct LocationProxy {
 impl LocationsDbProxy {
     fn retrieve(&self, term: String) -> PyResult<LocationProxy> {
         match self._db.lock().unwrap().retrieve(term.as_str()) {
-            Some(loc) => Python::with_gil(|_py| Ok(LocationProxy { _loc: loc, _db: self._db.clone() })),
+            Some(loc) => Python::with_gil(|_py| {
+                Ok(LocationProxy {
+                    _loc: loc,
+                    _db: self._db.clone(),
+                })
+            }),
             None => {
                 let err = PyKeyError::new_err(format!["{} not found", term.as_str()]);
                 Err(err)
@@ -43,17 +48,17 @@ impl LocationsDbProxy {
         let code = match Ustr::from_existing(state) {
             None => {
                 let err = PyKeyError::new_err(format!["{} not found as state key", state]);
-                return Err(err)
-            },
-            Some(code) => code
+                return Err(err);
+            }
+            Some(code) => code,
         };
         let result = {
             match self._db.lock().unwrap().state_by_code.get(&code) {
                 None => {
                     let err = PyKeyError::new_err(format!["{} not found as state key", state]);
                     Err(err)
-                },
-                Some(name) => Ok(name.to_string())
+                }
+                Some(name) => Ok(name.to_string()),
             }
         };
         result
@@ -64,17 +69,17 @@ impl LocationsDbProxy {
         let code = match Ustr::from_existing(code_str.as_str()) {
             None => {
                 let err = PyKeyError::new_err(format!["{} not found as subdiv key", code_str]);
-                return Err(err)
-            },
-            Some(code) => code
+                return Err(err);
+            }
+            Some(code) => code,
         };
         let result = {
             match self._db.lock().unwrap().subdiv_by_code.get(&code) {
                 None => {
                     let err = PyKeyError::new_err(format!["{} not found as subdiv key", subdiv]);
                     Err(err)
-                },
-                Some(name) => Ok(name.to_string())
+                }
+                Some(name) => Ok(name.to_string()),
             }
         };
         result
@@ -89,18 +94,15 @@ impl LocationsDbProxy {
     ) -> PyResult<Vec<LocationProxy>> {
         let results = Python::with_gil(|_py| {
             let st = SearchTerm::from_raw_query(query, state, limit, lev_distance);
-            let db = self._db
-                .lock()
-                .unwrap();
+            let db = self._db.lock().unwrap();
             db.search(&st)
                 .into_iter()
                 .map(|(key, _score)| {
-                    let loc = db
-                        .all
-                        .get(&key)
-                        .cloned()
-                        .expect("loc should be in db");
-                    LocationProxy { _loc: loc, _db: self._db.clone() }
+                    let loc = db.all.get(&key).cloned().expect("loc should be in db");
+                    LocationProxy {
+                        _loc: loc,
+                        _db: self._db.clone(),
+                    }
                 })
                 .collect()
         });
@@ -135,10 +137,8 @@ impl LocationProxy {
 
     fn get_names(&self) -> PyResult<Py<PyAny>> {
         let val: Result<_, PyAttributeError> = Python::with_gil(|py| {
-            let names: &PyList = PyList::new(
-                py,
-                self._loc.get_names().iter().map(|name| name.as_str())
-            );
+            let names: &PyList =
+                PyList::new(py, self._loc.get_names().iter().map(|name| name.as_str()));
             Ok(names.into())
         });
         Ok(val.unwrap())
@@ -146,10 +146,8 @@ impl LocationProxy {
 
     fn get_codes(&self) -> PyResult<Py<PyAny>> {
         let val: Result<_, PyAttributeError> = Python::with_gil(|py| {
-            let codes: &PyList = PyList::new(
-                py,
-                self._loc.get_codes().iter().map(|code| code.as_str())
-            );
+            let codes: &PyList =
+                PyList::new(py, self._loc.get_codes().iter().map(|code| code.as_str()));
             Ok(codes.into())
         });
         Ok(val.unwrap())
@@ -162,7 +160,7 @@ impl LocationProxy {
     fn get_subdiv_code(&self) -> Option<&str> {
         match self._loc.get_subdiv() {
             None => None,
-            Some(ustr) => Some(ustr.as_str())
+            Some(ustr) => Some(ustr.as_str()),
         }
     }
 
@@ -171,12 +169,17 @@ impl LocationProxy {
         let db = self._db.lock().unwrap();
         let child_nodes = db.indices.get(&self._loc.key).unwrap().children(&db.arena);
         let result = Python::with_gil(|_py| {
-            child_nodes.map(|node_id| {
-                let node = db.arena.get(node_id).unwrap();
-                let key = node.get();
-                let loc = db.retrieve(key).unwrap();
-                LocationProxy { _loc: loc, _db: self._db.clone() }
-            }).collect()
+            child_nodes
+                .map(|node_id| {
+                    let node = db.arena.get(node_id).unwrap();
+                    let key = node.get();
+                    let loc = db.retrieve(key).unwrap();
+                    LocationProxy {
+                        _loc: loc,
+                        _db: self._db.clone(),
+                    }
+                })
+                .collect()
         });
         Ok(result)
     }
@@ -187,7 +190,10 @@ impl LocationProxy {
         match db.state_by_code.get(&self._loc.get_state()) {
             Some(key) => Python::with_gil(|_py| {
                 let loc = db.retrieve(key).unwrap();
-                Ok(LocationProxy { _loc: loc, _db: self._db.clone() })
+                Ok(LocationProxy {
+                    _loc: loc,
+                    _db: self._db.clone(),
+                })
             }),
             None => {
                 let err = PyKeyError::new_err(format!["{} not found", self._loc.get_state()]);
@@ -205,15 +211,18 @@ impl LocationProxy {
                 match subdiv_key(state, key) {
                     Some(key) => {
                         let loc = db.retrieve(&key).unwrap();
-                        Ok(Some(LocationProxy { _loc: loc, _db: self._db.clone() }))
-                    },
+                        Ok(Some(LocationProxy {
+                            _loc: loc,
+                            _db: self._db.clone(),
+                        }))
+                    }
                     None => {
                         let err = PyKeyError::new_err(format!["{} not found", key]);
                         Err(err)
-                    },
+                    }
                 }
             }),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 }
@@ -347,7 +356,9 @@ fn load_from_json(
         };
         db.mk_fst()
     };
-    let db_proxy = LocationsDbProxy { _db: Arc::new(Mutex::new(db)) };
+    let db_proxy = LocationsDbProxy {
+        _db: Arc::new(Mutex::new(db)),
+    };
     Ok(db_proxy)
 }
 
@@ -364,7 +375,9 @@ fn load(data_dir: String) -> PyResult<LocationsDbProxy> {
             )));
         }
     };
-    let db_proxy = LocationsDbProxy { _db: Arc::new(Mutex::new(db)) };
+    let db_proxy = LocationsDbProxy {
+        _db: Arc::new(Mutex::new(db)),
+    };
     Ok(db_proxy)
 }
 

@@ -1,3 +1,4 @@
+import pytest
 from berlin import Location
 
 def test_search_with_state(db):
@@ -15,7 +16,6 @@ def test_search_with_state(db):
         assert list(loc.words) == ["abercarn"]
 
         assert isinstance(loc.get_score(), int)
-        print(loc.get_offset())
         offset = query.find("Abercarn") or 0
         assert loc.get_offset() == (offset, offset + len("Abercarn"))
 
@@ -33,6 +33,13 @@ def test_retrieve(db):
     assert db.get_state_key(loc.get_state_code()) == "ISO-3166-1-gb"
     assert db.get_subdiv_key(loc.get_state_code(), loc.get_subdiv_code()) == "ISO-3166-2-gb:cay"
     assert loc.subdiv.id == "gb:cay"
+
+def test_retrieve_with_score(db):
+    loc = db.retrieve("UN-LOCODE-gb:abc")
+    with pytest.raises(AttributeError):
+        loc.get_score()
+    with pytest.raises(AttributeError):
+        loc.get_offset()
 
 def test_retrieve_country(db):
     loc = db.retrieve("ISO-3166-1-gb")

@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use berlin_core::ustr::Ustr;
 use pyo3::exceptions::{PyAttributeError, PyKeyError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::PyList;
+use pyo3::types::{PyList, PyTuple};
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
@@ -14,7 +14,10 @@ use berlin_core::location::{subdiv_key, CsvLocode, Location};
 use berlin_core::locations_db::{
     parse_data_blocks, parse_data_files, parse_data_list, LocationsDb,
 };
-use berlin_core::search::SearchTerm;
+use berlin_core::search::{SearchTerm, Score};
+
+// We will cap scores to this number
+pub const MAXIMUM_SCORE: i32 = 1000;
 
 #[pyclass]
 struct LocationsDbProxy {
@@ -24,6 +27,7 @@ struct LocationsDbProxy {
 #[pyclass(name = "Location")]
 struct LocationProxy {
     _loc: Location,
+    _score: Option<Score>,
     _db: Arc<Mutex<LocationsDb>>,
 }
 
@@ -34,6 +38,7 @@ impl LocationsDbProxy {
             Some(loc) => Python::with_gil(|_py| {
                 Ok(LocationProxy {
                     _loc: loc,
+                    _score: None,
                     _db: self._db.clone(),
                 })
             }),
@@ -97,10 +102,11 @@ impl LocationsDbProxy {
             let db = self._db.lock().unwrap();
             db.search(&st)
                 .into_iter()
-                .map(|(key, _score)| {
+                .map(|(key, score)| {
                     let loc = db.all.get(&key).cloned().expect("loc should be in db");
                     LocationProxy {
                         _loc: loc,
+                        _score: Some(score),
                         _db: self._db.clone(),
                     }
                 })
@@ -133,6 +139,30 @@ impl LocationProxy {
             Ok(val)
         });
         Ok(val.unwrap())
+    }
+
+    fn get_score(&self) -> Result<i32, PyErr> {
+        match self._score {
+            Some(score) => {
+                Ok(match i32::try_from(score.score) {
+                    Ok(_score) => i32::max(MAXIMUM_SCORE, _score),
+                    _ => MAXIMUM_SCORE
+                })
+            },
+            None => Err(PyAttributeError::new_err(format!["No string offset attached to this location object"]))
+        }
+    }
+
+    fn get_offset(&self) -> PyResult<Py<PyTuple>> {
+        match self._score {
+            Some(score) => {
+                let offset_tuple = Python::with_gil(|_py| {
+                    PyTuple::new(_py, [score.offset.start, score.offset.end]).into()
+                });
+                Ok(offset_tuple)
+            },
+            None => Err(PyAttributeError::new_err(format!["No string offset attached to this location object"]))
+        }
     }
 
     fn get_names(&self) -> PyResult<Py<PyAny>> {
@@ -176,6 +206,7 @@ impl LocationProxy {
                     let loc = db.retrieve(key).unwrap();
                     LocationProxy {
                         _loc: loc,
+                        _score: None,
                         _db: self._db.clone(),
                     }
                 })
@@ -192,6 +223,7 @@ impl LocationProxy {
                 let loc = db.retrieve(key).unwrap();
                 Ok(LocationProxy {
                     _loc: loc,
+                    _score: None,
                     _db: self._db.clone(),
                 })
             }),
@@ -213,6 +245,7 @@ impl LocationProxy {
                         let loc = db.retrieve(&key).unwrap();
                         Ok(Some(LocationProxy {
                             _loc: loc,
+                            _score: None,
                             _db: self._db.clone(),
                         }))
                     }

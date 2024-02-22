@@ -14,7 +14,7 @@ use berlin_core::location::{subdiv_key, CsvLocode, Location};
 use berlin_core::locations_db::{
     parse_data_blocks, parse_data_files, parse_data_list, LocationsDb,
 };
-use berlin_core::search::{SearchTerm, Score};
+use berlin_core::search::{Score, SearchTerm};
 
 // We will cap scores to this number
 pub const MAXIMUM_SCORE: i32 = 1000;
@@ -143,13 +143,13 @@ impl LocationProxy {
 
     fn get_score(&self) -> Result<i32, PyErr> {
         match self._score {
-            Some(score) => {
-                Ok(match i32::try_from(score.score) {
-                    Ok(_score) => i32::max(MAXIMUM_SCORE, _score),
-                    _ => MAXIMUM_SCORE
-                })
-            },
-            None => Err(PyAttributeError::new_err(format!["No string offset attached to this location object"]))
+            Some(score) => Ok(match i32::try_from(score.score) {
+                Ok(_score) => i32::max(MAXIMUM_SCORE, _score),
+                _ => MAXIMUM_SCORE,
+            }),
+            None => Err(PyAttributeError::new_err(format![
+                "No string offset attached to this location object"
+            ])),
         }
     }
 
@@ -160,8 +160,10 @@ impl LocationProxy {
                     PyTuple::new(_py, [score.offset.start, score.offset.end]).into()
                 });
                 Ok(offset_tuple)
-            },
-            None => Err(PyAttributeError::new_err(format!["No string offset attached to this location object"]))
+            }
+            None => Err(PyAttributeError::new_err(format![
+                "No string offset attached to this location object"
+            ])),
         }
     }
 

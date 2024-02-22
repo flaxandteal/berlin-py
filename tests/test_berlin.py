@@ -16,6 +16,7 @@ def test_search_with_state(db):
         assert list(loc.words) == ["abercarn"]
 
         assert isinstance(loc.get_score(), int)
+        assert loc.get_score() == 1008
         offset = query.find("Abercarn") or 0
         assert loc.get_offset() == (offset, offset + len("Abercarn"))
 

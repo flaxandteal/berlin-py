@@ -4,4 +4,4 @@ from berlin._berlin import (
     Location as Location
 )
 
-__version__ = "0.3.11"
+__version__ = "0.3.12"

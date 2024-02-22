@@ -17,7 +17,7 @@ use berlin_core::locations_db::{
 use berlin_core::search::{Score, SearchTerm};
 
 // We will cap scores to this number
-pub const MAXIMUM_SCORE: i32 = 1000;
+pub const MAXIMUM_SCORE: i32 = 10000;
 
 #[pyclass]
 struct LocationsDbProxy {
@@ -144,7 +144,7 @@ impl LocationProxy {
     fn get_score(&self) -> Result<i32, PyErr> {
         match self._score {
             Some(score) => Ok(match i32::try_from(score.score) {
-                Ok(_score) => i32::max(MAXIMUM_SCORE, _score),
+                Ok(_score) => i32::min(MAXIMUM_SCORE, _score),
                 _ => MAXIMUM_SCORE,
             }),
             None => Err(PyAttributeError::new_err(format![

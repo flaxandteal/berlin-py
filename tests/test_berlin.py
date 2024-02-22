@@ -2,7 +2,6 @@ from berlin import Location
 
 def test_search_with_state(db):
     for query in ("Dentists in Abercarn", "Dental Abercarn"):
-        query = "Abercorn"
         state = "GB"
         limit = 2
         lev_distance = 2
@@ -17,7 +16,8 @@ def test_search_with_state(db):
 
         assert isinstance(loc.get_score(), int)
         print(loc.get_offset())
-        assert isinstance(loc.get_offset(), tuple)
+        offset = query.find("Abercarn") or 0
+        assert loc.get_offset() == (offset, offset + len("Abercarn"))
 
 def test_retrieve(db):
     loc = db.retrieve("UN-LOCODE-gb:abc")

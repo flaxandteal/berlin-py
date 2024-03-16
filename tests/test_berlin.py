@@ -1,6 +1,25 @@
 import pytest
 from berlin import Location
 
+def test_search_long(db):
+    for query, match in (
+        ("Where are all the dentists in Abercarn", "Abercarn"),
+        ("Whereareallthedentistsandhowdoifindtheminabercarn", None),
+        ("Whereareallthedentistsandhowdoi findthem iabercarn", "iabercarn"),
+        ("Whereareallthedentistsandhowdoi findthem in bognore regis", "bognore regis"),
+    ):
+        state = "GB"
+        limit = 2
+        lev_distance = 3
+
+        result = db.query(query, limit, lev_distance, state=state)
+        if match:
+            assert len(result) == 1, f"Did not find {match} in {query}"
+            loc = result[0]
+            assert isinstance(loc.get_score(), int)
+            offset = query.find(match) or 0
+            assert loc.get_offset() == (offset, offset + len(match))
+
 def test_search_with_state(db):
     for query in ("Dentists in Abercarn", "Dental Abercarn"):
         state = "GB"
@@ -59,8 +78,8 @@ def test_retrieve_country(db):
 
 def test_retrieve_country_children(db):
     loc = db.retrieve("ISO-3166-1-gb")
-    assert len(loc.children) == 2
-    assert {child.key for child in loc.children} == {"ISO-3166-2-gb:cay", "ISO-3166-2-gb:abd"}
+    assert len(loc.children) == 3
+    assert {child.key for child in loc.children} == {"ISO-3166-2-gb:cay", "ISO-3166-2-gb:abd", "ISO-3166-2-gb:wsx"}
 
     aberdeen = next(child for child in loc.children if child.key == "ISO-3166-2-gb:abd")
     assert len(aberdeen.children) == 1

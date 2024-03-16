@@ -1,6 +1,6 @@
 [package]
 name = "berlin-py"
-version = "0.3.9"
+version = "0.3.13"
 edition = "2021"
 license = "MIT"
 description = "Identify locations and tag them with UN-LOCODEs and ISO-3166-2 subdivisions."
@@ -18,7 +18,7 @@ crate-type = ["cdylib"]
 pyo3 = { version = "0.18.3", features = ["extension-module"] }
 serde = { version = "1.0.133", features = ["derive"] }
 serde_json = "1.0.74"
-berlin-core = "0.2.2"
+berlin-core = "0.2.4"
 
 # Logging
 tracing = "0.1.29"

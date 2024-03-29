@@ -30,9 +30,9 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "berlin-core"
-version = "0.2.4"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f5864554135e7827a10d35a906c750c3e6b1c0204468c318fa0868cfb66a2b3"
+checksum = "30acbd9ab65bd2c97855c4d1a98523e4e8220298c02b1a6bc4f64f393890260f"
 dependencies = [
  "ahash",
  "csv",

@@ -88,3 +88,17 @@ def test_retrieve_country_children(db):
     assert stonehaven.get_names() == ["stonehaven"]
 
     assert stonehaven.children == []
+
+def test_search_for_generic_with_state(db):
+    for query in ("Dentists in Two2", "Dental Two2"):
+        state = "GB"
+        limit = 2
+        lev_distance = 2
+
+        result = db.query(query, limit, lev_distance, state=state)
+        assert len(result) == 1
+        loc = result[0]
+        assert loc.key == "MY-STANDARD-gb:my-2"
+        assert loc.encoding == "MY-STANDARD"
+        assert loc.id == "gb:my-2"
+        assert list(loc.words) == ["My Two2"]

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use std::iter::Iterator;
 use std::path::PathBuf;
+use std::sync::MutexGuard;
 use std::sync::{Arc, Mutex};
 
 use berlin_core::ustr::Ustr;
@@ -29,6 +31,36 @@ struct LocationProxy {
     _loc: Location,
     _score: Option<Score>,
     _db: Arc<Mutex<LocationsDb>>,
+}
+
+impl LocationsDbProxy {
+    fn _list<'a>(
+        &'a self,
+        db: &'a MutexGuard<LocationsDb>,
+        encoding: &'a Option<String>,
+        state: &'a Option<String>,
+        subdiv: &'a Option<String>,
+    ) -> Box<dyn Iterator<Item = (&Ustr, &berlin_core::location::Location)> + 'a> {
+        let mut db_iter: Box<dyn Iterator<Item = (&Ustr, &Location)>> = Box::new(db.all.iter());
+        if encoding.is_none() {
+            db_iter =
+                Box::new(db_iter.filter(|(_, loc)| Some(loc.encoding.to_string()) == *encoding));
+        }
+        if state.is_none() {
+            db_iter =
+                Box::new(db_iter.filter(|(_, loc)| Some(loc.get_state().to_string()) == *state));
+        }
+        if subdiv.is_none() {
+            db_iter = Box::new(db_iter.filter(|(_, loc)| {
+                if let Some(loc_subdiv) = loc.get_subdiv() {
+                    Some(loc_subdiv.to_string()) == *subdiv
+                } else {
+                    false
+                }
+            }));
+        }
+        db_iter
+    }
 }
 
 #[pymethods]
@@ -110,6 +142,40 @@ impl LocationsDbProxy {
                         _db: self._db.clone(),
                     }
                 })
+                .collect()
+        });
+        Ok(results)
+    }
+
+    fn list(
+        &self,
+        encoding: Option<String>,
+        state: Option<String>,
+        subdiv: Option<String>,
+    ) -> PyResult<Vec<LocationProxy>> {
+        let results = Python::with_gil(|_py| {
+            let db = self._db.lock().unwrap();
+            self._list(&db, &encoding, &state, &subdiv)
+                .map(|(_, loc)| LocationProxy {
+                    _loc: loc.clone(),
+                    _score: None,
+                    _db: self._db.clone(),
+                })
+                .collect()
+        });
+        Ok(results)
+    }
+
+    fn list_by_key(
+        &self,
+        encoding: Option<String>,
+        state: Option<String>,
+        subdiv: Option<String>,
+    ) -> PyResult<Vec<String>> {
+        let results = Python::with_gil(|_py| {
+            let db = self._db.lock().unwrap();
+            self._list(&db, &encoding, &state, &subdiv)
+                .map(|(key, _)| key.to_string())
                 .collect()
         });
         Ok(results)

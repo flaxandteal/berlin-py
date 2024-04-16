@@ -23,5 +23,9 @@ def load_test_code_list():
         ]
 
 @pytest.fixture()
+def test_codes():
+    return json.loads(load_test_codes())
+
+@pytest.fixture()
 def db():
     return load_from_json([[load_test_codes()]], load_test_code_list())

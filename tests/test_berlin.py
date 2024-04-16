@@ -78,8 +78,8 @@ def test_retrieve_country(db):
 
 def test_retrieve_country_children(db):
     loc = db.retrieve("ISO-3166-1-gb")
-    assert len(loc.children) == 3
-    assert {child.key for child in loc.children} == {"ISO-3166-2-gb:cay", "ISO-3166-2-gb:abd", "ISO-3166-2-gb:wsx"}
+    assert len(loc.children) == 4
+    assert {child.key for child in loc.children} == {"ISO-3166-2-gb:cay", "ISO-3166-2-gb:abd", "ISO-3166-2-gb:wsx", "ISO-3166-2-gb:abc"}
 
     aberdeen = next(child for child in loc.children if child.key == "ISO-3166-2-gb:abd")
     assert len(aberdeen.children) == 1
@@ -98,7 +98,50 @@ def test_search_for_generic_with_state(db):
         result = db.query(query, limit, lev_distance, state=state)
         assert len(result) == 1
         loc = result[0]
-        assert loc.key == "MY-STANDARD-gb:my-2"
+        assert loc.key == "MY-STANDARD-my:2"
         assert loc.encoding == "MY-STANDARD"
-        assert loc.id == "gb:my-2"
-        assert list(loc.words) == ["My Two2"]
+        assert loc.id == "my:2"
+        assert list(loc.words) == ["two2"]
+
+def test_list(db, test_codes):
+    assert (
+        sorted(db.retrieve(key).id for key in db.list())
+        ==
+        sorted(code["i"].lower() for code in test_codes.values())
+    )
+    assert (
+            sorted(db.retrieve(key).id for key in db.list(subdiv="abc"))
+        ==
+        sorted(
+            code["i"].lower() for code in test_codes.values()
+            if code["d"].get("subcode") == "ABC" and code["d"].get("subdivision_code") in (None, "ABC")
+        )
+    )
+    assert (
+        sorted(db.retrieve(key).id for key in db.list(encoding="ISO-3166-2"))
+        ==
+        sorted(
+            code["i"].lower() for code in test_codes.values()
+            if code["<c>"] == "ISO-3166-2"
+        )
+    )
+    assert (
+        sorted(db.retrieve(key).id for key in db.list(state="gb"))
+        ==
+        sorted(
+            code["i"].lower() for code in test_codes.values()
+            if "GB" in (code["d"].get("supercode"), code["d"].get("alpha2"))
+        )
+    )
+    assert (
+        sorted(db.retrieve(key).id for key in db.list(state="bg", subdiv="02", encoding="UN-LOCODE"))
+        ==
+        sorted(
+            code["i"].lower() for code in test_codes.values()
+            if (
+                code["d"].get("supercode") == "BG" and
+                code["d"].get("subdivision_code") == "02" and
+                code["<c>"] == "UN-LOCODE"
+            )
+        )
+    )

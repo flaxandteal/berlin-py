@@ -34,26 +34,26 @@ struct LocationProxy {
 }
 
 impl LocationsDbProxy {
-    fn _list(
-        &self,
-        db: MutexGuard<'_, LocationsDb>,
-        encoding: Option<String>,
-        state: Option<String>,
-        subdiv: Option<String>,
-    ) -> Box<dyn Iterator<Item = (&Ustr, &berlin_core::location::Location)>> {
+    fn _list<'a>(
+        &'a self,
+        db: &'a MutexGuard<LocationsDb>,
+        encoding: &'a Option<String>,
+        state: &'a Option<String>,
+        subdiv: &'a Option<String>,
+    ) -> Box<dyn Iterator<Item = (&Ustr, &berlin_core::location::Location)> + 'a> {
         let mut db_iter: Box<dyn Iterator<Item = (&Ustr, &Location)>> = Box::new(db.all.iter());
-        if encoding != None {
+        if encoding.is_none() {
             db_iter =
-                Box::new(db_iter.filter(|(_, loc)| Some(loc.encoding.to_string()) == encoding));
+                Box::new(db_iter.filter(|(_, loc)| Some(loc.encoding.to_string()) == *encoding));
         }
-        if state != None {
+        if state.is_none() {
             db_iter =
-                Box::new(db_iter.filter(|(_, loc)| Some(loc.get_state().to_string()) == state));
+                Box::new(db_iter.filter(|(_, loc)| Some(loc.get_state().to_string()) == *state));
         }
-        if subdiv != None {
+        if subdiv.is_none() {
             db_iter = Box::new(db_iter.filter(|(_, loc)| {
                 if let Some(loc_subdiv) = loc.get_subdiv() {
-                    Some(loc_subdiv.to_string()) == subdiv
+                    Some(loc_subdiv.to_string()) == *subdiv
                 } else {
                     false
                 }
@@ -155,9 +155,9 @@ impl LocationsDbProxy {
     ) -> PyResult<Vec<LocationProxy>> {
         let results = Python::with_gil(|_py| {
             let db = self._db.lock().unwrap();
-            self._list(db, encoding, state, subdiv)
+            self._list(&db, &encoding, &state, &subdiv)
                 .map(|(_, loc)| LocationProxy {
-                    _loc: *loc,
+                    _loc: loc.clone(),
                     _score: None,
                     _db: self._db.clone(),
                 })
@@ -174,7 +174,7 @@ impl LocationsDbProxy {
     ) -> PyResult<Vec<String>> {
         let results = Python::with_gil(|_py| {
             let db = self._db.lock().unwrap();
-            self._list(db, encoding, state, subdiv)
+            self._list(&db, &encoding, &state, &subdiv)
                 .map(|(key, _)| key.to_string())
                 .collect()
         });

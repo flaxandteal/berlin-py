@@ -8,7 +8,7 @@ authors = [
     {name = "Metin Akat", email = "metin.akat@flaxandteal.co.uk"},
     {name = "Phil Weir", email = "phil.weir@flaxandteal.co.uk"}
 ]
-version = "0.3.14"
+version = "0.3.15"
 description = "Identify locations and tag them with UN-LOCODEs and ISO-3166-2 subdivisions."
 readme = "README.md"
 license = {file = "LICENSE.md"}

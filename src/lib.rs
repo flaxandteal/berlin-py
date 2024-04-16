@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::iter::Iterator;
-use std::mut::MutexGuard;
+use std::path::PathBuf;
+use std::sync::MutexGuard;
+use std::sync::{Arc, Mutex};
 
 use berlin_core::ustr::Ustr;
 use pyo3::exceptions::{PyAttributeError, PyKeyError, PyTypeError};
@@ -43,10 +43,12 @@ impl LocationsDbProxy {
     ) -> Box<dyn Iterator<Item = (&Ustr, &berlin_core::location::Location)>> {
         let mut db_iter: Box<dyn Iterator<Item = (&Ustr, &Location)>> = Box::new(db.all.iter());
         if encoding != None {
-            db_iter = Box::new(db_iter.filter(|(_, loc)| Some(loc.encoding.to_string()) == encoding));
+            db_iter =
+                Box::new(db_iter.filter(|(_, loc)| Some(loc.encoding.to_string()) == encoding));
         }
         if state != None {
-            db_iter = Box::new(db_iter.filter(|(_, loc)| Some(loc.get_state().to_string()) == state));
+            db_iter =
+                Box::new(db_iter.filter(|(_, loc)| Some(loc.get_state().to_string()) == state));
         }
         if subdiv != None {
             db_iter = Box::new(db_iter.filter(|(_, loc)| {
@@ -154,12 +156,10 @@ impl LocationsDbProxy {
         let results = Python::with_gil(|_py| {
             let db = self._db.lock().unwrap();
             self._list(db, encoding, state, subdiv)
-                .map(|(_, loc)| {
-                    LocationProxy {
-                        _loc: *loc,
-                        _score: None,
-                        _db: self._db.clone(),
-                    }
+                .map(|(_, loc)| LocationProxy {
+                    _loc: *loc,
+                    _score: None,
+                    _db: self._db.clone(),
                 })
                 .collect()
         });
@@ -175,9 +175,7 @@ impl LocationsDbProxy {
         let results = Python::with_gil(|_py| {
             let db = self._db.lock().unwrap();
             self._list(db, encoding, state, subdiv)
-                .map(|(key, _)| {
-                    key.to_string()
-                })
+                .map(|(key, _)| key.to_string())
                 .collect()
         });
         Ok(results)
